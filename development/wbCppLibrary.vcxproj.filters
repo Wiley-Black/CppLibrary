@@ -1,0 +1,295 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="DateTime">
+      <UniqueIdentifier>{8d025b6c-ba1d-4f52-b11a-bc71bb94d9ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation">
+      <UniqueIdentifier>{a22b9fb9-be97-44af-aaea-3c8ce5b9346b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Image Processing">
+      <UniqueIdentifier>{2c134608-50ce-481e-9fbe-5ea11eac7462}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IO">
+      <UniqueIdentifier>{99278bf4-87af-4983-af6e-d2bef534d9ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math">
+      <UniqueIdentifier>{6c82ca38-7fb9-400b-ae4c-4cf07506a87f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Memory Management">
+      <UniqueIdentifier>{b30f1a00-8e20-4365-8ab9-74d2291a421e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{bb52a8c5-5ed6-4bcd-bf04-5cdfbfc7e61c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parsing">
+      <UniqueIdentifier>{180c2d01-567a-4e31-a53a-9674007c9a11}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platforms">
+      <UniqueIdentifier>{3c561ca7-5580-488d-ab3d-5e5dfe553e45}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Processing">
+      <UniqueIdentifier>{ff9f669a-a3fa-4a1d-bebc-d47cb36b888f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System">
+      <UniqueIdentifier>{d6d36030-9efc-4d0f-9466-776e5786f6cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Text">
+      <UniqueIdentifier>{ceed2fde-f706-4aa5-a64d-d440e0e827af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\STL">
+      <UniqueIdentifier>{56665c1c-e097-433e-b70a-a3f5fc5ab8dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\STL\Collections">
+      <UniqueIdentifier>{1a32cb04-7e84-4bad-91df-0c9cc44b51c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\STL\Text">
+      <UniqueIdentifier>{b0cd9705-8fdc-4e15-b0e5-c6d06f14f44d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Image Processing\Implementation">
+      <UniqueIdentifier>{52bced00-e76f-4709-bdcd-6fbe8f0f8d44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IO\Compression">
+      <UniqueIdentifier>{ca9cca3b-f809-4302-a9f5-02d940426022}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Processing\Compilation">
+      <UniqueIdentifier>{5043a51f-89b2-4686-8e33-78235ee945ae}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parsing\Xml">
+      <UniqueIdentifier>{d1231a89-a9f5-41d0-aa01-634b983f2ee4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parsing\Xml\Implementation">
+      <UniqueIdentifier>{fc3da32e-9ea7-4db7-996e-a5afc6011abe}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\wbComplete.h" />
+    <ClInclude Include="..\include\wbCore.h" />
+    <ClInclude Include="..\include\wbFoundation.h" />
+    <ClInclude Include="..\include\DateTime\TimeSpan.h">
+      <Filter>DateTime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\DateTime\DateTime.h">
+      <Filter>DateTime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\DateTime\TimeConstants.h">
+      <Filter>DateTime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\Common.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\Exceptions.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\cstddef.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\Memory.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\StdException.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\utility.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\Collections\Iterators.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\Collections\Pair.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\Collections\Stack.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\Collections\UnorderedMap.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\Collections\Vector.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Foundation\STL\Text\String.h">
+      <Filter>Foundation\STL\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Images.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Kernels.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\Console.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\File.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\FileInfo.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\FileStream.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\MemoryStream.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\Path.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\Streams.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\IO\StreamWriter.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Math\Random.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Memory Management\Buffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Memory Management\FixedRingBuffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Memory Management\FlexRingBuffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Memory Management\FlexRingBufferEx.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Memory Management\HistoryRingBuffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Memory Management\MemoryInfo.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\IP4Address.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\NetworkInformation.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\SocketDependencies.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\SocketExceptions.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\Sockets.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\TCPSocket.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\UDPSocket.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Text\Encoding.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Text\StringBuilder.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Text\StringComparison.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Text\StringConversion.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Text\StringHelpers.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Diagnostics.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Environment.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\GPU.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Guid.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Monitor.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Process.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Registry.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Stopwatch.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\System\Threading.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Processing\CRC.h">
+      <Filter>Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Platforms\Language.h">
+      <Filter>Platforms</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Platforms\Platforms.h">
+      <Filter>Platforms</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\BaseTypeParsing.h">
+      <Filter>Parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\JsonParserToXml.h">
+      <Filter>Parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Xml\Xml.h">
+      <Filter>Parsing\Xml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Xml\XmlParser.h">
+      <Filter>Parsing\Xml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Xml\Implementation\XmlImpl.h">
+      <Filter>Parsing\Xml\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Xml\Implementation\XmlParserImpl.h">
+      <Filter>Parsing\Xml\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Base.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Conversions.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Convolution.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Memory.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Color.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_LoadSave.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\PixelType_Primitives.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Transforms.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\ImageFFT.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Math.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Network\XMLSocket.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\Readme.txt" />
+    <Text Include="..\include\IO\Compression\PkZip File Format Specification.TXT">
+      <Filter>IO\Compression</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

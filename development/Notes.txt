@@ -1,0 +1,3 @@
+The library is compatible with multiple versions of Visual C++.  It is a header-file based library so there is no need for a Visual C++ project file.
+The Visual C++ project file listing all the header files is found here in development/ for convenience when doing development work on the library 
+itself, and development of the library is done with Visual Studio 2019.

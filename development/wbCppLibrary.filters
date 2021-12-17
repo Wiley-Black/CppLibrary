@@ -1,0 +1,555 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Algorithms">
+      <UniqueIdentifier>{55c8f68a-1cc4-4a44-a02b-6a24d2d8c077}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Collections">
+      <UniqueIdentifier>{fdae354d-68b1-4af7-b86b-b10b46ca79aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Image Processing">
+      <UniqueIdentifier>{988eed3b-ea99-4fde-a23d-a8eff53b8955}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Image Processing\libtiff">
+      <UniqueIdentifier>{967a8ab5-9e11-40fe-b21c-23bdf4a8f460}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IO">
+      <UniqueIdentifier>{3fa24e7b-3206-4783-9732-fa9aa33c1ecb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IO\Compression">
+      <UniqueIdentifier>{7abc870f-dd09-40c9-a68d-792b136ab6e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Machine Learning">
+      <UniqueIdentifier>{48b268fb-487e-4d09-9a47-7d165812c994}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Math">
+      <UniqueIdentifier>{3b24a9d5-c35f-4c55-9e31-a2efd7eb8d86}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Memory Management">
+      <UniqueIdentifier>{6a7c64d7-b3ac-4bf2-bbfe-3a17d744e56e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{8747b218-c704-488b-aee8-d875b1888902}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parsing">
+      <UniqueIdentifier>{24c811cd-4341-4f15-8f11-006f1357b10f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parsing\Xml">
+      <UniqueIdentifier>{567aac22-cadc-47b2-b53f-c24a7c3fddab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Processing">
+      <UniqueIdentifier>{6429798c-eb6d-4996-9bd0-95eea9bf6350}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Processing\Compilation">
+      <UniqueIdentifier>{4f024ab4-c546-4f30-a941-d3bf32c12125}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Ray Tracing">
+      <UniqueIdentifier>{9ac19711-eadb-45f7-901c-288487d78728}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System">
+      <UniqueIdentifier>{550ac209-c25d-467b-8186-aef4d4fe2f64}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Text">
+      <UniqueIdentifier>{36f3600b-e0fc-4c1d-8619-053bc0fe8405}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DateTime">
+      <UniqueIdentifier>{c1f85721-d769-402e-acf6-ec9b8677fcbd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parsing\Xml\Implementation">
+      <UniqueIdentifier>{9fd29b9f-f502-4e86-b467-f1151c3b9916}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platforms">
+      <UniqueIdentifier>{4bcae22f-828d-4afe-a6e9-47f9db703a97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation">
+      <UniqueIdentifier>{63aef4ca-3f52-4dd3-bee8-f8f2cd601c5d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\STL">
+      <UniqueIdentifier>{bf9a1e7b-0ffd-4c74-9f35-d8faaa2a0598}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\STL\Collections">
+      <UniqueIdentifier>{81162927-08fd-46cc-8a45-eadaf308010e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Foundation\STL\Text">
+      <UniqueIdentifier>{605c0c42-eaa5-4c50-88c6-9267d1f69edf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="config">
+      <UniqueIdentifier>{5bc49495-6f31-4e0e-9650-c5a4fa830a12}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Image Processing\Implementation">
+      <UniqueIdentifier>{e2cf64da-b2f7-447d-87d1-57de4487697e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Algorithms\EvolutionaryAlgorithm.h">
+      <Filter>Algorithms</Filter>
+    </ClInclude>
+    <ClInclude Include="Collections\NonbinaryStringTree.h">
+      <Filter>Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\AviWriter.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\CUDA_Images.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\CUDA_Matrices.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\CUDA_Vectors.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\Images.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\LIPSE.h">
+      <Filter>Image Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\t4.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tif_config.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tif_dir.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tif_fax3.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tif_predict.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tiff.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tiffconf.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tiffio.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tiffio.hxx">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tiffiop.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\tiffvers.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\libtiff\uvcode.h">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\BitStream.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\Console.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\File.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\FileInfo.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\FileStream.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\Path.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\StreamFragment.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\StreamReassembly.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\StreamWriter.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\Compression\DeflateStream.h">
+      <Filter>IO\Compression</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\Compression\DeflateStream_InternalImpl.h">
+      <Filter>IO\Compression</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\Compression\HuffmanTable.h">
+      <Filter>IO\Compression</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\Compression\ZipFile.h">
+      <Filter>IO\Compression</Filter>
+    </ClInclude>
+    <ClInclude Include="Machine Learning\CUDA_DeepLearning.h">
+      <Filter>Machine Learning</Filter>
+    </ClInclude>
+    <ClInclude Include="Math\Random.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory Management\FixedRingBuffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory Management\FlexRingBuffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory Management\FlexRingBufferEx.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory Management\HistoryRingBuffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory Management\MemoryInfo.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\IP4Address.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\NetworkInformation.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\SocketExceptions.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\Sockets.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\TCPSocket.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\UDPSocket.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Parsing\Xml\Xml.h">
+      <Filter>Parsing\Xml</Filter>
+    </ClInclude>
+    <ClInclude Include="Parsing\Xml\XmlParser.h">
+      <Filter>Parsing\Xml</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing\Compilation\Tokenizer.h">
+      <Filter>Processing\Compilation</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing\Compilation\TokenizerWithRecognition.h">
+      <Filter>Processing\Compilation</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing\Callback.h">
+      <Filter>Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing\CRC.h">
+      <Filter>Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing\Licensing.h">
+      <Filter>Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing\Process.h">
+      <Filter>Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing\SearchAlgorithms.h">
+      <Filter>Processing</Filter>
+    </ClInclude>
+    <ClInclude Include="RayTracing\Ellipsoid.h">
+      <Filter>Ray Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="RayTracing\Plenoptic1Camera.h">
+      <Filter>Ray Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="RayTracing\PointSource.h">
+      <Filter>Ray Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="RayTracing\RayTraceCamera.h">
+      <Filter>Ray Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="RayTracing\RayTracing.h">
+      <Filter>Ray Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="RayTracing\Scene.h">
+      <Filter>Ray Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="RayTracing\Support.h">
+      <Filter>Ray Tracing</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Diagnostics.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Environment.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\FixedPoint.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Guid.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Process.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Threading.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Timing.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Text\StringBuilder.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Text\StringComparison.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Text\StringConversion.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Registry.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\PipeStream.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Monitor.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="System\Stopwatch.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Text\Encoding.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="DateTime\DateTime.h">
+      <Filter>DateTime</Filter>
+    </ClInclude>
+    <ClInclude Include="DateTime\TimeConstants.h">
+      <Filter>DateTime</Filter>
+    </ClInclude>
+    <ClInclude Include="DateTime\TimeSpan.h">
+      <Filter>DateTime</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\EndianBinaryReader.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\EndianBinaryWriter.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\MemoryStream.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="IO\Streams.h">
+      <Filter>IO</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory Management\Allocation.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="Memory Management\Buffer.h">
+      <Filter>Memory Management</Filter>
+    </ClInclude>
+    <ClInclude Include="Parsing\BaseTypeParsing.h">
+      <Filter>Parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="Parsing\JsonParserToXml.h">
+      <Filter>Parsing</Filter>
+    </ClInclude>
+    <ClInclude Include="Parsing\Xml\Implementation\XmlImpl.h">
+      <Filter>Parsing\Xml\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="Parsing\Xml\Implementation\XmlParserImpl.h">
+      <Filter>Parsing\Xml\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="Platforms\COM.h">
+      <Filter>Platforms</Filter>
+    </ClInclude>
+    <ClInclude Include="Platforms\Language.h">
+      <Filter>Platforms</Filter>
+    </ClInclude>
+    <ClInclude Include="Platforms\Platforms.h">
+      <Filter>Platforms</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\Common.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\Exceptions.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\SocketDependencies.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\Collections\Iterators.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\Collections\Pair.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\Collections\Stack.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\Collections\UnorderedMap.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\Collections\Vector.h">
+      <Filter>Foundation\STL\Collections</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\Text\String.h">
+      <Filter>Foundation\STL\Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Text\StringHelpers.h">
+      <Filter>Text</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\StdException.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\Memory.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\cstddef.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="Foundation\STL\utility.h">
+      <Filter>Foundation\STL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\config\wbConfiguration.h">
+      <Filter>config</Filter>
+    </ClInclude>
+    <ClInclude Include="System\GPU.h">
+      <Filter>System</Filter>
+    </ClInclude>
+    <ClInclude Include="Image Processing\Implementation\Images_Kernels.h">
+      <Filter>Image Processing\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="wbComplete.h" />
+    <ClInclude Include="wbCore.h" />
+    <ClInclude Include="wbFoundation.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Image Processing\libtiff\tif_aux.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_close.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_codec.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_color.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_compress.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_dir.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_dirinfo.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_dirread.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_dirwrite.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_dumpmode.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_error.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_extension.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_fax3.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_fax3sm.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_flush.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_getimage.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_jbig.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_jpeg.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_jpeg_12.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_luv.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_lzma.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_lzw.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_next.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_ojpeg.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_open.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_packbits.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_pixarlog.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_predict.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_print.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_read.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_stream.cxx">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_strip.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_swab.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_thunder.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_tile.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_unix.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_version.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_warning.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_win32.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_write.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Image Processing\libtiff\tif_zip.c">
+      <Filter>Image Processing\libtiff</Filter>
+    </ClCompile>
+    <ClCompile Include="Text\Encoding.cpp">
+      <Filter>Text</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="IO\Compression\PkZip File Format Specification.TXT">
+      <Filter>IO\Compression</Filter>
+    </Text>
+    <Text Include="..\Readme.txt" />
+  </ItemGroup>
+</Project>

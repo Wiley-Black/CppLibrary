@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31105.61
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wbCppLibrary", "wbCppLibrary.vcxproj", "{F6512909-854A-4FA0-B3A7-6AE78118184A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wbLibraryUnitTesting", "unit_testing\wbLibraryUnitTesting.vcxproj", "{E35F7539-01A5-4058-AEE2-0EF9594291FF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F6512909-854A-4FA0-B3A7-6AE78118184A}.Debug|x64.ActiveCfg = Debug|x64
+		{F6512909-854A-4FA0-B3A7-6AE78118184A}.Debug|x64.Build.0 = Debug|x64
+		{F6512909-854A-4FA0-B3A7-6AE78118184A}.Release|x64.ActiveCfg = Release|x64
+		{F6512909-854A-4FA0-B3A7-6AE78118184A}.Release|x64.Build.0 = Release|x64
+		{E35F7539-01A5-4058-AEE2-0EF9594291FF}.Debug|x64.ActiveCfg = Debug|x64
+		{E35F7539-01A5-4058-AEE2-0EF9594291FF}.Debug|x64.Build.0 = Debug|x64
+		{E35F7539-01A5-4058-AEE2-0EF9594291FF}.Release|x64.ActiveCfg = Release|x64
+		{E35F7539-01A5-4058-AEE2-0EF9594291FF}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F8B60802-731E-46B9-B4E7-71C0B0567B28}
+	EndGlobalSection
+EndGlobal

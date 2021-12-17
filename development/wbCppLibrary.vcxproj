@@ -1,0 +1,163 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\DateTime\DateTime.h" />
+    <ClInclude Include="..\include\DateTime\TimeConstants.h" />
+    <ClInclude Include="..\include\DateTime\TimeSpan.h" />
+    <ClInclude Include="..\include\Foundation\Common.h" />
+    <ClInclude Include="..\include\Foundation\Exceptions.h" />
+    <ClInclude Include="..\include\Foundation\STL\Collections\Iterators.h" />
+    <ClInclude Include="..\include\Foundation\STL\Collections\Pair.h" />
+    <ClInclude Include="..\include\Foundation\STL\Collections\Stack.h" />
+    <ClInclude Include="..\include\Foundation\STL\Collections\UnorderedMap.h" />
+    <ClInclude Include="..\include\Foundation\STL\Collections\Vector.h" />
+    <ClInclude Include="..\include\Foundation\STL\cstddef.h" />
+    <ClInclude Include="..\include\Foundation\STL\Memory.h" />
+    <ClInclude Include="..\include\Foundation\STL\StdException.h" />
+    <ClInclude Include="..\include\Foundation\STL\Text\String.h" />
+    <ClInclude Include="..\include\Foundation\STL\utility.h" />
+    <ClInclude Include="..\include\Image Processing\ImageFFT.h" />
+    <ClInclude Include="..\include\Image Processing\Images.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Base.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Color.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Conversions.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Convolution.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Kernels.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_LoadSave.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Math.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Memory.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\Images_Transforms.h" />
+    <ClInclude Include="..\include\Image Processing\Implementation\PixelType_Primitives.h" />
+    <ClInclude Include="..\include\IO\Console.h" />
+    <ClInclude Include="..\include\IO\File.h" />
+    <ClInclude Include="..\include\IO\FileInfo.h" />
+    <ClInclude Include="..\include\IO\FileStream.h" />
+    <ClInclude Include="..\include\IO\MemoryStream.h" />
+    <ClInclude Include="..\include\IO\Path.h" />
+    <ClInclude Include="..\include\IO\Streams.h" />
+    <ClInclude Include="..\include\IO\StreamWriter.h" />
+    <ClInclude Include="..\include\Math\Random.h" />
+    <ClInclude Include="..\include\Memory Management\Buffer.h" />
+    <ClInclude Include="..\include\Memory Management\FixedRingBuffer.h" />
+    <ClInclude Include="..\include\Memory Management\FlexRingBuffer.h" />
+    <ClInclude Include="..\include\Memory Management\FlexRingBufferEx.h" />
+    <ClInclude Include="..\include\Memory Management\HistoryRingBuffer.h" />
+    <ClInclude Include="..\include\Memory Management\MemoryInfo.h" />
+    <ClInclude Include="..\include\Network\IP4Address.h" />
+    <ClInclude Include="..\include\Network\NetworkInformation.h" />
+    <ClInclude Include="..\include\Network\SocketDependencies.h" />    
+    <ClInclude Include="..\include\Network\SocketExceptions.h" />
+    <ClInclude Include="..\include\Network\Sockets.h" />
+    <ClInclude Include="..\include\Network\TCPSocket.h" />
+    <ClInclude Include="..\include\Network\UDPSocket.h" />
+    <ClInclude Include="..\include\Network\XMLSocket.h" />
+    <ClInclude Include="..\include\Parsing\BaseTypeParsing.h" />
+    <ClInclude Include="..\include\Parsing\JsonParserToXml.h" />
+    <ClInclude Include="..\include\Parsing\Xml\Implementation\XmlImpl.h" />
+    <ClInclude Include="..\include\Parsing\Xml\Implementation\XmlParserImpl.h" />
+    <ClInclude Include="..\include\Parsing\Xml\Xml.h" />
+    <ClInclude Include="..\include\Parsing\Xml\XmlParser.h" />
+    <ClInclude Include="..\include\Platforms\Language.h" />
+    <ClInclude Include="..\include\Platforms\Platforms.h" />
+    <ClInclude Include="..\include\Processing\CRC.h" />
+    <ClInclude Include="..\include\System\Diagnostics.h" />
+    <ClInclude Include="..\include\System\Environment.h" />    
+    <ClInclude Include="..\include\System\GPU.h" />
+    <ClInclude Include="..\include\System\Guid.h" />
+    <ClInclude Include="..\include\System\Monitor.h" />
+    <ClInclude Include="..\include\System\Process.h" />
+    <ClInclude Include="..\include\System\Registry.h" />
+    <ClInclude Include="..\include\System\Stopwatch.h" />
+    <ClInclude Include="..\include\System\Threading.h" />    
+    <ClInclude Include="..\include\Text\Encoding.h" />
+    <ClInclude Include="..\include\Text\StringBuilder.h" />
+    <ClInclude Include="..\include\Text\StringComparison.h" />
+    <ClInclude Include="..\include\Text\StringConversion.h" />
+    <ClInclude Include="..\include\Text\StringHelpers.h" />
+    <ClInclude Include="..\include\wbComplete.h" />
+    <ClInclude Include="..\include\wbCore.h" />
+    <ClInclude Include="..\include\wbFoundation.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\include\IO\Compression\PkZip File Format Specification.TXT" />
+    <Text Include="..\Readme.txt" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{F6512909-854A-4FA0-B3A7-6AE78118184A}</ProjectGuid>
+    <RootNamespace>WileyBlacksCLibrary</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.2.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(CudaToolkitIncludeDir);$(ProjectDir)config;$(ProjectDir)include;$(ProjectDir)unit_testing/FreeImageDLL/x64;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(CudaToolkitIncludeDir);$(ProjectDir)config;$(ProjectDir)include;$(ProjectDir)unit_testing/FreeImageDLL/x64;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);NoSTL</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>../config</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions);NoSTL</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>../config</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.2.targets" />
+  </ImportGroup>
+</Project>
