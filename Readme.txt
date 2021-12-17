@@ -1,6 +1,6 @@
 This is a "header-only" library that can be accessed with just an #include directive and a little configuration.  
 
-Most of my library is designed to match the .NET Framework API as closely as possible in C++.  Refer to MSDN documentation for a lot of it.  Some classes have additional comments, usually following the XML <summary> format that Visual Studio supports.
+Most of my library is designed to match the .NET Framework API as closely as possible in C++, however it is entirely unmanaged code.  Refer to MSDN documentation for a lot of it.  Some classes have additional comments, usually following the XML <summary> format that Visual Studio supports.
 
 ==== Usage STEP 1: configuration ====
 
