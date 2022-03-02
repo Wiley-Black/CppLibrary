@@ -55,7 +55,7 @@
     <ClInclude Include="..\include\Memory Management\MemoryInfo.h" />
     <ClInclude Include="..\include\Network\IP4Address.h" />
     <ClInclude Include="..\include\Network\NetworkInformation.h" />
-    <ClInclude Include="..\include\Network\SocketDependencies.h" />    
+    <ClInclude Include="..\include\Network\SocketDependencies.h" />
     <ClInclude Include="..\include\Network\SocketExceptions.h" />
     <ClInclude Include="..\include\Network\Sockets.h" />
     <ClInclude Include="..\include\Network\TCPSocket.h" />
@@ -71,14 +71,14 @@
     <ClInclude Include="..\include\Platforms\Platforms.h" />
     <ClInclude Include="..\include\Processing\CRC.h" />
     <ClInclude Include="..\include\System\Diagnostics.h" />
-    <ClInclude Include="..\include\System\Environment.h" />    
+    <ClInclude Include="..\include\System\Environment.h" />
     <ClInclude Include="..\include\System\GPU.h" />
     <ClInclude Include="..\include\System\Guid.h" />
     <ClInclude Include="..\include\System\Monitor.h" />
     <ClInclude Include="..\include\System\Process.h" />
     <ClInclude Include="..\include\System\Registry.h" />
     <ClInclude Include="..\include\System\Stopwatch.h" />
-    <ClInclude Include="..\include\System\Threading.h" />    
+    <ClInclude Include="..\include\System\Threading.h" />
     <ClInclude Include="..\include\Text\Encoding.h" />
     <ClInclude Include="..\include\Text\StringBuilder.h" />
     <ClInclude Include="..\include\Text\StringComparison.h" />
@@ -113,7 +113,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.2.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.6.props" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -158,6 +158,6 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.2.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.6.targets" />
   </ImportGroup>
 </Project>
