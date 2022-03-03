@@ -1,12 +1,12 @@
 /////////
-//	XmlImpl.h (Generation 4)
-//	Copyright (C) 2010-2014 by Wiley Black
+//	XmlImpl.h (Generation 5)
+//	Copyright (C) 2010-2022 by Wiley Black
 ////
 
-#ifndef __WBXmlImpl_v4_h__
-#define __WBXmlImpl_v4_h__
+#ifndef __WBXmlImpl_v5_h__
+#define __WBXmlImpl_v5_h__
 
-#ifndef __WBXml_v4_h__
+#ifndef __WBXml_v5_h__
 #error	This header should be included only via Xml.h.
 #endif
 
@@ -37,7 +37,7 @@ namespace wb
 			EscapeAttributeWhitespace = cp.EscapeAttributeWhitespace;
 		}
 
-		inline XmlWriterOptions::XmlWriterOptions(XmlWriterOptions&& cp)
+		inline XmlWriterOptions::XmlWriterOptions(XmlWriterOptions&& cp) noexcept
 		{
 			IncludeContent = cp.IncludeContent;
 			Indentation = cp.Indentation;
@@ -61,7 +61,6 @@ namespace wb
 
 		inline XmlNode::~XmlNode()
 		{
-			for (size_t ii=0; ii < Children.size(); ii++) delete Children[ii];
 			Children.clear();
 		}		
 
@@ -141,8 +140,8 @@ namespace wb
 				string ret;
 				//int nSinceLF = 0;
 				for (size_t ii=0; ii < Children.size(); ii++)
-				{					
-					XmlNode* pChild = Children[ii];
+				{
+					auto pChild = Children[ii];
 					string substr = pChild->ToString(Options);
 					ret += substr;
 					//nSinceLF += substr.length();
@@ -164,48 +163,38 @@ namespace wb
 			throw NotImplementedException("Conversion to Json value for this node was not implemented.");
 		}
 
-		inline vector<XmlElement*> XmlNode::Elements()
+		inline const vector<shared_ptr<XmlElement>> XmlNode::Elements() const
 		{
-			vector<XmlElement*> ret;
+			vector<shared_ptr<XmlElement>> ret;
 			for (size_t ii = 0; ii < Children.size(); ii++)
 			{
-				if (Children[ii]->IsElement()) ret.push_back((XmlElement*)Children[ii]);
+				if (Children[ii]->IsElement()) ret.push_back(dynamic_pointer_cast<XmlElement>(Children[ii]));
 			}
 			return ret;
 		}
 
-		inline vector<const XmlElement*> XmlNode::Elements() const
-		{
-			vector<const XmlElement*> ret;
-			for (size_t ii = 0; ii < Children.size(); ii++)
-			{
-				if (Children[ii]->IsElement()) ret.push_back((const XmlElement*)Children[ii]);
-			}
-			return ret;
-		}
-
-		inline XmlElement *XmlNode::FindChild(const char *pszTagName)
+		inline shared_ptr<XmlElement> XmlNode::FindChild(const string& TagName)
 		{
 			for (size_t ii=0; ii < Children.size(); ii++)
 			{			
 				if (Children[ii]->IsElement())
 				{
-					XmlElement *pElement = (XmlElement *)Children[ii];
-					if (IsEqual(pElement->LocalName, pszTagName)) return pElement;
+					auto pElement = dynamic_pointer_cast<XmlElement>(Children[ii]);
+					if (IsEqual(pElement->LocalName, TagName)) return pElement;
 				}
 			}
 			return NULL;
 		}
 
-		inline XmlElement *XmlNode::FindNthChild(const char *pszTagName, int N)
+		inline shared_ptr<XmlElement> XmlNode::FindNthChild(const string& TagName, int N)
 		{
 			int Matches = 0;
 			for (size_t ii=0; ii < Children.size(); ii++)
 			{
 				if (Children[ii]->IsElement())
 				{
-					XmlElement *pElement = (XmlElement *)Children[ii];
-					if (IsEqual(pElement->LocalName, pszTagName))
+					auto pElement = dynamic_pointer_cast<XmlElement>(Children[ii]);
+					if (IsEqual(pElement->LocalName, TagName))
 					{
 						if (Matches == N) return pElement;				
 						Matches ++;
@@ -213,19 +202,18 @@ namespace wb
 				}
 			}
 			return nullptr;
-		}
+		}		
 
-		inline XmlNode *XmlNode::AppendChild(XmlNode *pNewChild)
-		{	
+		inline void XmlNode::AppendChild(shared_ptr<XmlNode> pNewChild)
+		{			
 			Children.push_back(pNewChild);
-			return pNewChild;
 		}
 
-		inline void XmlNode::RemoveChild(XmlNode *pChild)
+		inline void XmlNode::RemoveChild(shared_ptr<XmlNode> pChild)
 		{
 			for (size_t ii=0; ii < Children.size(); ii++)
 			{
-				if (Children[ii] == pChild)
+				if (Children[ii].get() == pChild.get())
 				{
 					Children.erase(Children.begin() + ii);
 
@@ -234,7 +222,7 @@ namespace wb
 					return;
 				}
 			}
-		}		
+		}
 
 		/** XmlDocument Implementation **/
 		
@@ -242,7 +230,7 @@ namespace wb
 		{		
 			if (!Options.IncludeContent) return "XmlDocument";
 			return XmlNode::ToString(Options);
-		}		
+		}
 
 		inline string XmlDocument::ToJson(JsonWriterOptions Options)
 		{			
@@ -256,27 +244,20 @@ namespace wb
 			Indent(Options, ret);
 			ret += "}\n";
 			return ret;
-		}
+		}		
 
-		inline XmlElement *XmlDocument::CreateElement(const char *pszLocalName)
-		{
-			XmlElement *pNewElement = new XmlElement();
-			pNewElement->LocalName = pszLocalName;
-			return pNewElement;
-		}
-
-		inline XmlElement *XmlDocument::GetDocumentElement() { 
+		inline shared_ptr<XmlElement> XmlDocument::GetDocumentElement() { 
 			if (!Children.size()) return NULL; 
 			if (!Children[0]->IsElement()) return NULL;
-			return (XmlElement *)Children[0];
+			return dynamic_pointer_cast<XmlElement>(Children[0]);
 		}
 
-		inline XmlNode* XmlDocument::DeepCopy() 
+		inline shared_ptr<XmlNode> XmlDocument::DeepCopy() 
 		{ 
-			XmlDocument* pRet = new XmlDocument();
+			auto pRet = make_shared<XmlDocument>();
 			for (size_t ii=0; ii < Children.size(); ii++)
 			{
-				XmlNode* pCopy = Children[ii]->DeepCopy();
+				auto pCopy = Children[ii]->DeepCopy();
 				pRet->Children.push_back(pCopy);
 			}
 			return pRet;
@@ -284,55 +265,46 @@ namespace wb
 
 		/** XmlElement Implementation **/
 
-		inline XmlElement::XmlElement()
+		inline XmlElement::XmlElement(const string& LocalName /*= ""*/)
 		{			
+			this->LocalName = LocalName;
 		}
 
 		inline XmlElement::~XmlElement()
-		{
-			// The XmlElement is responsible for deleting all its attributes.
-			for (size_t ii=0; ii < Attributes.size(); ii++) delete Attributes[ii];
+		{			
 			Attributes.clear();
 		}
 
-		inline XmlAttribute *XmlElement::FindAttribute(const char *pszAttrName) const
+		inline shared_ptr<XmlAttribute> XmlElement::FindAttribute(const string& AttrName) const
 		{
 			for (size_t ii=0; ii < Attributes.size(); ii++)
 			{
-				if (IsEqual(Attributes[ii]->Name, pszAttrName)) return Attributes[ii];
+				if (IsEqual(Attributes[ii]->Name, AttrName)) return Attributes[ii];
 			}
 			return NULL;
 		}
 
-		inline void XmlElement::AddStringAsAttr(const char *pszAttrName, const char *pszValue)
+		inline void XmlElement::AddStringAsAttr(const string& AttrName, const string& Value)
 		{
-			XmlAttribute *pNewAttr = new XmlAttribute;
-			pNewAttr->Name = pszAttrName;
-			pNewAttr->Value = pszValue;
-			Attributes.push_back(pNewAttr);
-		}
-
-		inline void XmlElement::AddStringAsAttr(const char *pszAttrName, const string& Value)
-		{
-			XmlAttribute *pNewAttr = new XmlAttribute;
-			pNewAttr->Name = pszAttrName;
+			auto pNewAttr = make_shared<XmlAttribute>();
+			pNewAttr->Name = AttrName;
 			pNewAttr->Value = Value;
 			Attributes.push_back(pNewAttr);
-		}				
+		}		
 
-		inline void XmlElement::AddStringAsText(const char *pszName, const string& Value)
+		inline void XmlElement::AddStringAsText(const string& Name, const string& Value)
 		{
-			XmlElement* pNewChild = new XmlElement();
-			pNewChild->LocalName = pszName;
-			XmlText* pNewText = new XmlText();
-			pNewText->Text = Value;
+			auto pNewChild = make_shared<XmlElement>();
+			pNewChild->LocalName = Name;
+			auto pNewText = make_shared<XmlText>();
+			pNewText->Text = Value;			
 			pNewChild->Children.push_back(pNewText);
 			Children.push_back(pNewChild);
-		}			
+		}
 
 		inline void XmlElement::AddString(const string& Value)
 		{
-			XmlText* pNewText = new XmlText();
+			auto pNewText = make_shared<XmlText>();
 			pNewText->Text = Value;
 			Children.push_back(pNewText);
 		}		
@@ -347,7 +319,7 @@ namespace wb
 			
 			for (size_t ii=0; ii < Attributes.size(); ii++)
 			{
-				XmlAttribute *pAttr = Attributes[ii];			
+				auto pAttr = Attributes[ii];			
 				ret += ' ';
 				ret += pAttr->Name;
 				ret += '='; ret += '\"';
@@ -391,10 +363,10 @@ namespace wb
 			bool NeedsComma = false;
 			for (size_t ii=0; ii < Children.size(); ii++)
 			{
-				XmlNode* pChild = Children[ii];
+				auto pChild = Children[ii];
 
 				// Special handling for element-wrapped XmlText nodes (additional special handling for this happens after this loop):
-				if (dynamic_cast<XmlText*>(pChild) != nullptr) { childtext += ((XmlText*)pChild)->Text; continue; }
+				if (dynamic_pointer_cast<XmlText>(pChild) != nullptr) { childtext += (dynamic_pointer_cast<XmlText>(pChild))->Text; continue; }
 
 				// Special case handling for JSON arrays:
 				if (pChild->IsElement())
@@ -403,9 +375,9 @@ namespace wb
 					bool IsArrayHandled = false;					
 					for (size_t jj = 0; jj < ii; jj++)
 					{
-						XmlElement* pOtherChild = dynamic_cast<XmlElement*>(Children[jj]);
+						auto pOtherChild = dynamic_pointer_cast<XmlElement>(Children[jj]);
 						if (pOtherChild == nullptr) continue;
-						if (IsEqual(((XmlElement*)pChild)->LocalName, pOtherChild->LocalName)) { IsArrayHandled = true; break; }
+						if (IsEqual(dynamic_pointer_cast<XmlElement>(pChild)->LocalName, pOtherChild->LocalName)) { IsArrayHandled = true; break; }
 					}
 					if (IsArrayHandled) continue;
 
@@ -415,9 +387,9 @@ namespace wb
 					vector<string> ArrayContents;					
 					for (size_t jj = ii + 1; jj < Children.size(); jj++)
 					{
-						XmlElement* pOtherChild = dynamic_cast<XmlElement*>(Children[jj]);
+						auto pOtherChild = dynamic_pointer_cast<XmlElement>(Children[jj]);
 						if (pOtherChild == nullptr) continue;
-						if (IsEqual(((XmlElement*)pChild)->LocalName, pOtherChild->LocalName))
+						if (IsEqual(dynamic_pointer_cast<XmlElement>(pChild)->LocalName, pOtherChild->LocalName))
 						{
 							if (ArrayContents.size() == 0) ArrayContents.push_back(pChild->ToJsonValue(Options));
 							ArrayContents.push_back(pOtherChild->ToJsonValue(Options));
@@ -433,16 +405,16 @@ namespace wb
 							// we have a problem - this is a case where XML does not translate readily into JSON.
 							for (size_t jj = ii + ArrayContents.size(); jj < Children.size(); jj++)
 							{
-								XmlElement* pOtherChild = dynamic_cast<XmlElement*>(Children[jj]);
+								auto pOtherChild = dynamic_pointer_cast<XmlElement>(Children[jj]);
 								if (pOtherChild == nullptr) continue;
-								if (IsEqual(((XmlElement*)pChild)->LocalName, pOtherChild->LocalName))							
+								if (IsEqual(dynamic_pointer_cast<XmlElement>(pChild)->LocalName, pOtherChild->LocalName))
 									throw NotSupportedException("Cannot convert this XML heirarchy to JSON because a JSON array can only be formed from repeated and consecutive elements of the same name.  In this case, we have non-consecutive occurrances of element <" + pOtherChild->LocalName + ">.");							
 							}
 						}
 					
 						if (NeedsComma) { childstr += ",\n"; Indent(Options, childstr); NeedsComma = false; }
 						childstr += '\"';
-						childstr += Escape(Options, ((XmlElement*)pChild)->LocalName);
+						childstr += Escape(Options, dynamic_pointer_cast<XmlElement>(pChild)->LocalName);
 						childstr += "\": [\n";
 						for (size_t jj=0; jj < ArrayContents.size(); jj++)
 						{
@@ -489,7 +461,7 @@ namespace wb
 			for (size_t ii=0; ii < Attributes.size(); ii++)
 			{
 				if (NeedsComma) { ret += ",\n"; Indent(Options, ret); NeedsComma = false; }
-				XmlAttribute *pAttr = Attributes[ii];
+				auto pAttr = dynamic_pointer_cast<XmlAttribute>(Attributes[ii]);
 				ret += '\"';
 				ret += Escape(Options, pAttr->Name);
 				ret += "\": \"";
@@ -520,18 +492,18 @@ namespace wb
 			return ret;
 		}
 
-		inline XmlNode* XmlElement::DeepCopy() 
+		inline shared_ptr<XmlNode> XmlElement::DeepCopy() 
 		{ 
-			XmlElement * pRet = new XmlElement();
+			auto pRet = make_shared<XmlElement>();
 			pRet->LocalName = LocalName;
 			for (size_t ii=0; ii < Children.size(); ii++)
 			{
-				XmlNode* pCopy = Children[ii]->DeepCopy();
+				auto pCopy = Children[ii]->DeepCopy();
 				pRet->Children.push_back(pCopy);
 			}
 			for (size_t ii=0; ii < Attributes.size(); ii++)
 			{
-				XmlAttribute* pCopy = new XmlAttribute(*Attributes[ii]);
+				auto pCopy = make_shared<XmlAttribute>(*Attributes[ii]);
 				pRet->Attributes.push_back(pCopy);
 			}
 			return pRet;
@@ -544,7 +516,7 @@ namespace wb
 			for (size_t ii=0; ii < Children.size(); ii++)
 			{
 				if (Children[ii]->GetType() != XmlNode::Type::Text) throw FormatException("Node contained non-textual content.");
-				ret += ((XmlText*)Children[ii])->Text;
+				ret += dynamic_pointer_cast<XmlText>(Children[ii])->Text;
 			}
 			return ret;
 		}
@@ -593,107 +565,107 @@ namespace wb
 
 		/** Attribute retrieval conveniences **/
 
-		inline string XmlElement::GetAttribute(const char *pszAttrName) const
+		inline string XmlElement::GetAttribute(const string& AttrName) const
 		{
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return "";
 			return pAttr->Value;
 		}
 
-		inline string XmlElement::GetAttrAsString(const char *pszAttrName, const char *pszDefaultValue /*= _T("")*/) const { 
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
-			if (!pAttr) return pszDefaultValue;
+		inline string XmlElement::GetAttrAsString(const string& AttrName, const string& DefaultValue /*= _T("")*/) const { 
+			auto pAttr = FindAttribute(AttrName);
+			if (!pAttr) return DefaultValue;
 			return pAttr->Value;
 		}
 
-		inline int XmlElement::GetAttrAsInt32(const char *pszAttrName, int lDefaultValue /*= 0*/) const {
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+		inline int XmlElement::GetAttrAsInt32(const string& AttrName, int lDefaultValue /*= 0*/) const {
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return lDefaultValue;
 			Int32 Value;
 			if (Int32_TryParse(pAttr->Value.c_str(), NumberStyles::Integer, Value)) return Value;
-			throw FormatException(string("Xml attribute ") + string(pszAttrName) + " found but has invalid format.");
+			throw FormatException("Xml attribute " + AttrName + " found but has invalid format.");
 		}
 
-		inline unsigned int XmlElement::GetAttrAsUInt32(const char *pszAttrName, unsigned int lDefaultValue /*= 0*/) const {
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+		inline unsigned int XmlElement::GetAttrAsUInt32(const string& AttrName, unsigned int lDefaultValue /*= 0*/) const {
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return lDefaultValue;
 			UInt32 Value;
 			if (UInt32_TryParse(pAttr->Value.c_str(), NumberStyles::Integer, Value)) return Value;
-			throw FormatException(string("Xml attribute ") + string(pszAttrName) + " found but has invalid format.");
+			throw FormatException("Xml attribute " + AttrName + " found but has invalid format.");
 		}
 
-		inline Int64 XmlElement::GetAttrAsInt64(const char *pszAttrName, Int64 DefaultValue /*= 0*/) const {
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+		inline Int64 XmlElement::GetAttrAsInt64(const string& AttrName, Int64 DefaultValue /*= 0*/) const {
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return DefaultValue;
 			Int64 Value;
 			if (Int64_TryParse(pAttr->Value.c_str(), NumberStyles::Integer, Value)) return Value;
-			throw FormatException(string("Xml attribute ") + string(pszAttrName) + " found but has invalid format.");
+			throw FormatException("Xml attribute " + AttrName + " found but has invalid format.");
 		}
 
-		inline UInt64 XmlElement::GetAttrAsUInt64(const char *pszAttrName, UInt64 DefaultValue /*= 0*/) const {
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+		inline UInt64 XmlElement::GetAttrAsUInt64(const string& AttrName, UInt64 DefaultValue /*= 0*/) const {
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return DefaultValue;
 			UInt64 Value;
 			if (UInt64_TryParse(pAttr->Value.c_str(), NumberStyles::Integer, Value)) return Value;
-			throw FormatException(string("Xml attribute ") + string(pszAttrName) + " found but has invalid format.");
+			throw FormatException("Xml attribute " + AttrName + " found but has invalid format.");
 		}
 
-		inline float XmlElement::GetAttrAsFloat(const char *pszAttrName, float DefaultValue /*= 0.0*/) const {
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+		inline float XmlElement::GetAttrAsFloat(const string& AttrName, float DefaultValue /*= 0.0*/) const {
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return DefaultValue;
 			float Value;
 			if (Float_TryParse(pAttr->Value.c_str(), NumberStyles::Integer, Value)) return Value;
-			throw FormatException(string("Xml attribute ") + string(pszAttrName) + " found but has invalid format.");
+			throw FormatException("Xml attribute " + AttrName + " found but has invalid format.");
 		}
 
-		inline double XmlElement::GetAttrAsDouble(const char *pszAttrName, double DefaultValue /*= 0.0*/) const {
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+		inline double XmlElement::GetAttrAsDouble(const string& AttrName, double DefaultValue /*= 0.0*/) const {
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return DefaultValue;
 			double Value;
 			if (Double_TryParse(pAttr->Value.c_str(), NumberStyles::Integer, Value)) return Value;
-			throw FormatException(string("Xml attribute ") + string(pszAttrName) + " found but has invalid format.");
+			throw FormatException("Xml attribute " + AttrName + " found but has invalid format.");
 		}
 
-		inline bool XmlElement::GetAttrAsBool(const char *pszAttrName, bool DefaultValue /*= false*/) const {
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
+		inline bool XmlElement::GetAttrAsBool(const string& AttrName, bool DefaultValue /*= false*/) const {
+			auto pAttr = FindAttribute(AttrName);
 			if (!pAttr) return DefaultValue;
 			bool Value;
 			if (Bool_TryParse(pAttr->Value.c_str(), Value)) return Value;
-			throw FormatException(string("Xml attribute ") + string(pszAttrName) + " found but has invalid format.");
+			throw FormatException("Xml attribute " + AttrName + " found but has invalid format.");
 		}
 
-		inline void XmlElement::AddInt32AsAttr(const char *pszAttrName, int Value) { AddStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void XmlElement::AddUInt32AsAttr(const char *pszAttrName, unsigned int Value) { AddStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void XmlElement::AddInt64AsAttr(const char *pszAttrName, Int64 Value) { AddStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void XmlElement::AddUInt64AsAttr(const char *pszAttrName, UInt64 Value) { AddStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void XmlElement::AddFloatAsAttr(const char *pszAttrName, float Value) { AddStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void XmlElement::AddDoubleAsAttr(const char *pszAttrName, double Value) { AddStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void XmlElement::AddBoolAsAttr(const char *pszAttrName, bool Value) { AddStringAsAttr(pszAttrName, Convert::ToString(Value)); }
+		inline void XmlElement::AddInt32AsAttr(const string& AttrName, int Value) { AddStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void XmlElement::AddUInt32AsAttr(const string& AttrName, unsigned int Value) { AddStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void XmlElement::AddInt64AsAttr(const string& AttrName, Int64 Value) { AddStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void XmlElement::AddUInt64AsAttr(const string& AttrName, UInt64 Value) { AddStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void XmlElement::AddFloatAsAttr(const string& AttrName, float Value) { AddStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void XmlElement::AddDoubleAsAttr(const string& AttrName, double Value) { AddStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void XmlElement::AddBoolAsAttr(const string& AttrName, bool Value) { AddStringAsAttr(AttrName, Convert::ToString(Value)); }
 
-		inline bool XmlElement::IsAttrPresent(const char *pszAttrName) const { return FindAttribute(pszAttrName) != nullptr; }
+		inline bool XmlElement::IsAttrPresent(const string& AttrName) const { return FindAttribute(AttrName) != nullptr; }
 
-		inline void	XmlElement::SetStringAsAttr(const char *pszAttrName, const string& sValue)
+		inline void	XmlElement::SetStringAsAttr(const string& AttrName, const string& sValue)
 		{	
-			XmlAttribute *pAttr = FindAttribute(pszAttrName);
-			if (!pAttr) { AddStringAsAttr(pszAttrName, sValue); return; }
+			auto pAttr = FindAttribute(AttrName);
+			if (!pAttr) { AddStringAsAttr(AttrName, sValue); return; }
 			pAttr->Value = sValue;
 		}
 
-		inline void XmlElement::SetInt32AsAttr(const char *pszAttrName, int Value) { SetStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }		
-		inline void	XmlElement::SetUInt32AsAttr(const char *pszAttrName, unsigned int Value) { SetStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void	XmlElement::SetInt64AsAttr(const char *pszAttrName, Int64 Value) { SetStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void	XmlElement::SetUInt64AsAttr(const char *pszAttrName, UInt64 Value) { SetStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void	XmlElement::SetFloatAsAttr(const char *pszAttrName, float Value) { SetStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void	XmlElement::SetDoubleAsAttr(const char *pszAttrName, double Value) { SetStringAsAttr(pszAttrName, Convert::ToString(Value).c_str()); }
-		inline void XmlElement::SetBoolAsAttr(const char *pszAttrName, bool Value) { SetStringAsAttr(pszAttrName, Convert::ToString(Value)); }
+		inline void XmlElement::SetInt32AsAttr(const string& AttrName, int Value) { SetStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }		
+		inline void	XmlElement::SetUInt32AsAttr(const string& AttrName, unsigned int Value) { SetStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void	XmlElement::SetInt64AsAttr(const string& AttrName, Int64 Value) { SetStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void	XmlElement::SetUInt64AsAttr(const string& AttrName, UInt64 Value) { SetStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void	XmlElement::SetFloatAsAttr(const string& AttrName, float Value) { SetStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void	XmlElement::SetDoubleAsAttr(const string& AttrName, double Value) { SetStringAsAttr(AttrName, Convert::ToString(Value).c_str()); }
+		inline void XmlElement::SetBoolAsAttr(const string& AttrName, bool Value) { SetStringAsAttr(AttrName, Convert::ToString(Value)); }
 
-		inline void XmlElement::AddInt32AsText(const char *pszName, int Value) { AddStringAsText(pszName, Convert::ToString(Value)); }
-		inline void XmlElement::AddUInt32AsText(const char *pszName, unsigned int Value) { AddStringAsText(pszName, Convert::ToString(Value)); }
-		inline void XmlElement::AddInt64AsText(const char *pszName, Int64 Value) { AddStringAsText(pszName, Convert::ToString(Value)); }
-		inline void XmlElement::AddUInt64AsText(const char *pszName, UInt64 Value) { AddStringAsText(pszName, Convert::ToString(Value)); }
-		inline void XmlElement::AddFloatAsText(const char *pszName, float Value) { AddStringAsText(pszName, Convert::ToString(Value)); }
-		inline void XmlElement::AddDoubleAsText(const char *pszName, double Value) { AddStringAsText(pszName, Convert::ToString(Value)); }
-		inline void XmlElement::AddBoolAsText(const char *pszName, bool Value) { AddStringAsText(pszName, Convert::ToString(Value)); }
+		inline void XmlElement::AddInt32AsText(const string& Name, int Value) { AddStringAsText(Name, Convert::ToString(Value)); }
+		inline void XmlElement::AddUInt32AsText(const string& Name, unsigned int Value) { AddStringAsText(Name, Convert::ToString(Value)); }
+		inline void XmlElement::AddInt64AsText(const string& Name, Int64 Value) { AddStringAsText(Name, Convert::ToString(Value)); }
+		inline void XmlElement::AddUInt64AsText(const string& Name, UInt64 Value) { AddStringAsText(Name, Convert::ToString(Value)); }
+		inline void XmlElement::AddFloatAsText(const string& Name, float Value) { AddStringAsText(Name, Convert::ToString(Value)); }
+		inline void XmlElement::AddDoubleAsText(const string& Name, double Value) { AddStringAsText(Name, Convert::ToString(Value)); }
+		inline void XmlElement::AddBoolAsText(const string& Name, bool Value) { AddStringAsText(Name, Convert::ToString(Value)); }
 
 		inline void XmlElement::AddInt32(int Value) { AddString(Convert::ToString(Value)); }
 		inline void XmlElement::AddUInt32(unsigned int Value) { AddString(Convert::ToString(Value)); }
@@ -768,9 +740,9 @@ namespace wb
 			throw NotSupportedException("XmlText must be intercepted by the XmlElement container before the ToJson() call.  XmlText cannot be converted to Json directly, but must be converted as part of the larger Xml structure.");
 		}
 
-		inline XmlNode* XmlText::DeepCopy() 
+		inline shared_ptr<XmlNode> XmlText::DeepCopy() 
 		{ 
-			XmlText * pRet = new XmlText();
+			auto pRet = make_shared<XmlText>();
 			assert (Children.size() == 0);			// XmlText nodes should not have children.			
 			pRet->Text = Text;
 			return pRet;
@@ -778,7 +750,7 @@ namespace wb
 	}
 }
 
-#endif	// __WBXmlImpl_v4_h__
+#endif	// __WBXmlImpl_v5_h__
 
 //	End of XmlImpl.h
 

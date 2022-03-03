@@ -1,10 +1,10 @@
 /////////
-//	Xml Structure (Generation 4)
-//	Copyright (C) 2010-2014 by Wiley Black
+//	Xml Structure (Generation 5)
+//	Copyright (C) 2010-2022 by Wiley Black
 ////
 
-#ifndef __WBXml_v4_h__
-#define __WBXml_v4_h__
+#ifndef __WBXml_v5_h__
+#define __WBXml_v5_h__
 
 /** Table of Contents **/
 
@@ -57,7 +57,7 @@ namespace wb
 			bool	EscapeAttributeWhitespace;
 			
 			XmlWriterOptions(XmlWriterOptions&);
-			XmlWriterOptions(XmlWriterOptions&&);
+			XmlWriterOptions(XmlWriterOptions&&) noexcept;
 			XmlWriterOptions(bool AndContent = true);
 		};
 
@@ -116,37 +116,34 @@ namespace wb
 
 		public:	
 
-			vector<XmlNode*>	Children;
+			vector<shared_ptr<XmlNode>>	Children;
 
 			/// <summary>
 			/// Elements() provides a vector containing references to all children that are XmlElements.
 			/// </summary>
-			vector<const XmlElement*>	Elements() const;
-
-			/// <summary>
-			/// Elements() provides a vector containing references to all children that are XmlElements.
-			/// </summary>
-			vector<XmlElement*>	Elements();
+			const vector<shared_ptr<XmlElement>>	Elements() const;
 
 				/** FindChild(): Returns the first child element matching the specified tag name.
 					Returns NULL if no child elements match the tag name.  Descends exactly 
 					one level only (in other words, grandchildren and siblings are not considered.) **/
-			XmlElement *FindChild(const char *pszTagName);
+			shared_ptr<XmlElement> FindChild(const string& TagName);
 
 				/** FindNthChild(): Behaves the same as FindChild(), but returns the Nth occurrance
 					of the tag name in the children list.  Returns NULL if fewer than (N+1) child elements
 					match the tag name. **/
-			XmlElement *FindNthChild(const char *pszTagName, int N);
-
-				/** Appends the specified node at the end of the list of child nodes.  The node must
-					have been created using XmlDocument.Create...() methods, and responsibility for
-					deleting the node becomes that of the XmlNode container after this call. **/
-			XmlNode *AppendChild(XmlNode *pNewChild);
+			shared_ptr<XmlElement> FindNthChild(const string& TagName, int N);
+			
+				/** Appends the specified node at the end of the list of child nodes. **/
+			void AppendChild(shared_ptr<XmlNode> pNewChild);
+			void AppendChild(shared_ptr<XmlElement>& pNewChild) { AppendChild(dynamic_pointer_cast<XmlNode>(pNewChild)); }
+			void AppendChild(shared_ptr<XmlText>& pNewChild) { AppendChild(dynamic_pointer_cast<XmlNode>(pNewChild)); }
 
 				/** Removes the node matching the pointer given.  The memory associated with pChild is
 					not freed, however responsibility for freeing it (with delete) becomes that of the
 					caller. **/
-			void RemoveChild(XmlNode *pChild);
+			void RemoveChild(shared_ptr<XmlNode> pChild);
+			void RemoveChild(shared_ptr<XmlElement>& pChild) { RemoveChild(dynamic_pointer_cast<XmlNode>(pChild)); }
+			void RemoveChild(shared_ptr<XmlText>& pChild) { RemoveChild(dynamic_pointer_cast<XmlNode>(pChild)); }
 
 				/** Returns true if there are child nodes contained in this XmlNode **/
 			bool HasChildNodes() { return Children.size() > 0; }
@@ -168,7 +165,7 @@ namespace wb
 			/// <summary>Creates a deep copy of this node, all children, and all attributes.  The caller assumes 
 			/// responsibility for delete'ing the returned node.  The returned copy is not attached to any
 			/// higher-level hierarchy and has no parent.</summary>
-			virtual XmlNode*	DeepCopy() = 0;
+			virtual shared_ptr<XmlNode>	DeepCopy() = 0;
 
 			/// <summary>Available for more information during exceptions, the SourceLocation can be set by the parser to
 			/// later identify where an XmlNode originated from.  Note that an XmlNode created in code will not have a
@@ -194,16 +191,11 @@ namespace wb
 					this Xml document.  NULL is returned if the top-level element
 					does not exist.
 				**/
-			XmlElement *GetDocumentElement();
-
-				/** The created node should either be delete'd after use, or
-					responsibility should be passed using XmlNode::AppendChild().
-				**/
-			XmlElement *CreateElement(const char *pszLocalName);
+			shared_ptr<XmlElement>	GetDocumentElement();
 
 			XmlNode::Type	GetType() { return XmlNode::Type::Document; }
 
-			XmlNode*		DeepCopy() override;
+			shared_ptr<XmlNode>		DeepCopy() override;
 		};
 
 		/** XmlElement **/
@@ -211,28 +203,27 @@ namespace wb
 		/// <summary>XmlElement represents any xml element, which is a node that can contain other xml nodes and/or xml attributes.</summary>
 		class XmlElement : public XmlNode
 		{
-		protected:
-			XmlElement();
-
+		protected:			
 			friend class	XmlParser;	
 			friend class	XmlDocument;
 			string	ToJsonValue(JsonWriterOptions Options = JsonWriterOptions()) override;
 
 		public:
+			XmlElement(const string& LocalName = "");
 			XmlElement(const XmlElement&) = delete;			// Use DeepCopy instead.
 			~XmlElement();
 
 			string			LocalName;
 
-			vector<XmlAttribute*>	Attributes;
+			vector<shared_ptr<XmlAttribute>>	Attributes;
 
 				/** GetAttribute(): Returns the value for the attribute with the specified name.
 					Returns an empty string if the attribute is not found. **/
-			string			GetAttribute(const char *pszAttrName) const;
+			string			GetAttribute(const string& AttrName) const;
 
 				/** FindAttribute(): Returns the attribute with the specified name.  Returns NULL
 					if the attribute is not found. **/
-			XmlAttribute	*FindAttribute(const char *pszAttrName) const;
+			shared_ptr<XmlAttribute>	FindAttribute(const string& AttrName) const;
 
 				/** GetAs...(pszAttrName, [Default Value]) helpers:
 					A series of convenient attribute conversion/access/find functions.  Each call 
@@ -255,59 +246,58 @@ namespace wb
 					for the named attribute.  If it is not found, the default value is returned.  If it
 					is found, it is converted to the type of the function and returned.  If conversion
 					fails, a FormatException is thrown. **/
-			string			GetAttrAsString(const char *pszAttrName, const char *DefaultValue = "") const;
-			int				GetAttrAsInt32(const char *pszAttrName, int DefaultValue = 0) const;
-			unsigned int	GetAttrAsUInt32(const char *pszAttrName, unsigned int DefaultValue = 0) const;
-			Int64			GetAttrAsInt64(const char *pszAttrName, Int64 DefaultValue = 0) const;
-			UInt64			GetAttrAsUInt64(const char *pszAttrName, UInt64 DefaultValue = 0) const;
-			float			GetAttrAsFloat(const char *pszAttrName, float DefaultValue = 0.0) const;
-			double			GetAttrAsDouble(const char *pszAttrName, double DefaultValue = 0.0) const;
-			bool  			GetAttrAsBool(const char *pszAttrName, bool DefaultValue = false) const;
+			string			GetAttrAsString(const string& AttrName, const string& DefaultValue = "") const;
+			int				GetAttrAsInt32(const string& AttrName, int DefaultValue = 0) const;
+			unsigned int	GetAttrAsUInt32(const string& AttrName, unsigned int DefaultValue = 0) const;
+			Int64			GetAttrAsInt64(const string& AttrName, Int64 DefaultValue = 0) const;
+			UInt64			GetAttrAsUInt64(const string& AttrName, UInt64 DefaultValue = 0) const;
+			float			GetAttrAsFloat(const string& AttrName, float DefaultValue = 0.0) const;
+			double			GetAttrAsDouble(const string& AttrName, double DefaultValue = 0.0) const;
+			bool  			GetAttrAsBool(const string& AttrName, bool DefaultValue = false) const;
 			/**
 			complex<double>	GetAttrAsComplex(const char *pszAttrName, complex<double> cDefaultValue ) const;
 			complex<double>	GetAttrAsComplex(const char *pszAttrName ) const { complex<double> cZero = 0.; return GetAsComplex(pszAttrName,cZero); }
 			**/
-			bool			IsAttrPresent(const char *pszAttrName ) const;
+			bool			IsAttrPresent(const string& AttrName ) const;
 
 				/** Add...AsAttr(pszAttrName, [Value]) helpers:
 					A series of convenient attribute creation functions.  Each appends a new attribute
 					to the end of the attribute list after converting the attribute into a string
-					format. **/
-			void			AddStringAsAttr(const char *pszAttrName, const char *pszValue);
-			void			AddStringAsAttr(const char *pszAttrName, const string& Value);
-			void			AddInt32AsAttr(const char *pszAttrName, int Value);
-			void			AddUInt32AsAttr(const char *pszAttrName, unsigned int Value);
-			void			AddInt64AsAttr(const char *pszAttrName, Int64 Value);
-			void			AddUInt64AsAttr(const char *pszAttrName, UInt64 Value);
-			void			AddFloatAsAttr(const char *pszAttrName, float Value);
-			void			AddDoubleAsAttr(const char *pszAttrName, double Value);
-			void			AddBoolAsAttr(const char *pszAttrName, bool Value);
+					format. **/			
+			void			AddStringAsAttr(const string& AttrName, const string& Value);
+			void			AddInt32AsAttr(const string& AttrName, int Value);
+			void			AddUInt32AsAttr(const string& AttrName, unsigned int Value);
+			void			AddInt64AsAttr(const string& AttrName, Int64 Value);
+			void			AddUInt64AsAttr(const string& AttrName, UInt64 Value);
+			void			AddFloatAsAttr(const string& AttrName, float Value);
+			void			AddDoubleAsAttr(const string& AttrName, double Value);
+			void			AddBoolAsAttr(const string& AttrName, bool Value);
 
 				/** Set...AsAttr(pszAttrName, [Value]) helpers:
 					A series of attribute editing functions.  Each searches for the attribute, and
 					if it is found, replaces its value with that given.  If the attribute is not
 					present, it is added with the given value. **/
-			void			SetStringAsAttr(const char *pszAttrname, const string& sValue);
-			void			SetInt32AsAttr(const char *pszAttrName, int Value);
-			void			SetUInt32AsAttr(const char *pszAttrName, unsigned int Value);
-			void			SetInt64AsAttr(const char *pszAttrName, Int64 Value);
-			void			SetUInt64AsAttr(const char *pszAttrName, UInt64 Value);
-			void			SetFloatAsAttr(const char *pszAttrName, float Value);
-			void			SetDoubleAsAttr(const char *pszAttrName, double Value);
-			void  			SetBoolAsAttr(const char *pszAttrName, bool Value);
+			void			SetStringAsAttr(const string& AttrName, const string& sValue);
+			void			SetInt32AsAttr(const string& AttrName, int Value);
+			void			SetUInt32AsAttr(const string& AttrName, unsigned int Value);
+			void			SetInt64AsAttr(const string& AttrName, Int64 Value);
+			void			SetUInt64AsAttr(const string& AttrName, UInt64 Value);
+			void			SetFloatAsAttr(const string& AttrName, float Value);
+			void			SetDoubleAsAttr(const string& AttrName, double Value);
+			void  			SetBoolAsAttr(const string& AttrName, bool Value);
 
 				/** Add...AsText(pszName, [Value]) helpers:
 					A series of convenient element creation functions.  Each appends a new element
 					to the end of the children of this node containing the textual form of the
 					value. **/			
-			void			AddStringAsText(const char *pszName, const string& Value);
-			void			AddInt32AsText(const char *pszName, int Value);
-			void			AddUInt32AsText(const char *pszName, unsigned int Value);
-			void			AddInt64AsText(const char *pszName, Int64 Value);
-			void			AddUInt64AsText(const char *pszName, UInt64 Value);
-			void			AddFloatAsText(const char *pszName, float Value);
-			void			AddDoubleAsText(const char *pszName, double Value);
-			void			AddBoolAsText(const char *pszName, bool Value);
+			void			AddStringAsText(const string& Name, const string& Value);
+			void			AddInt32AsText(const string& Name, int Value);
+			void			AddUInt32AsText(const string& Name, unsigned int Value);
+			void			AddInt64AsText(const string& Name, Int64 Value);
+			void			AddUInt64AsText(const string& Name, UInt64 Value);
+			void			AddFloatAsText(const string& Name, float Value);
+			void			AddDoubleAsText(const string& Name, double Value);
+			void			AddBoolAsText(const string& Name, bool Value);
 
 				/** Add...([Value]) helpers:
 					A series of convenient functions.  Each creates an XmlText child
@@ -327,7 +317,7 @@ namespace wb
 
 			string			ToString(XmlWriterOptions Options = XmlWriterOptions()) override;
 			string			ToJson(JsonWriterOptions Options = JsonWriterOptions()) override;
-			XmlNode*		DeepCopy() override;
+			shared_ptr<XmlNode>		DeepCopy() override;
 		};
 
 		/** XmlText **/
@@ -351,7 +341,7 @@ namespace wb
 
 			string			ToString(XmlWriterOptions Options = XmlWriterOptions()) override;
 			string			ToJson(JsonWriterOptions Options = JsonWriterOptions()) override;
-			XmlNode*		DeepCopy() override;
+			shared_ptr<XmlNode>		DeepCopy() override;
 
 			static string	Escape(string RegularText);
 			static string	Unescape(string EscapedText);
@@ -363,7 +353,7 @@ namespace wb
 
 #include "Implementation/XmlImpl.h"
 
-#endif	// __WBXml_v4_h__
+#endif	// __WBXml_v5_h__
 
 //	End of Xml.h
 

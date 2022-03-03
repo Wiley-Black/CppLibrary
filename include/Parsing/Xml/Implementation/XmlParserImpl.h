@@ -1,11 +1,11 @@
 /////////
-//	XmlParserImpl.h (Generation 4)
+//	XmlParserImpl.h (Generation 5)
 ////
 
-#ifndef __wbXmlParserImpl_v4_h__
-#define __wbXmlParserImpl_v4_h__
+#ifndef __wbXmlParserImpl_v5_h__
+#define __wbXmlParserImpl_v5_h__
 
-#ifndef __wbXmlParser_v4_h__
+#ifndef __wbXmlParser_v5_h__
 #error	This header should be included only via XmlParser.h.
 #endif
 
@@ -25,6 +25,12 @@ namespace wb
 		/** XmlParser Implementation **/
 		
 		inline XmlParser::XmlParser()
+			: 
+			BWhitespace(0),
+			Current(0),
+			CurrentLineNumber(-1),
+			QuoteChar(0),
+			pCurrentStream(nullptr)
 		{
 			Loaded = 0;
 			CurrentState = State::Unknown;
@@ -50,14 +56,14 @@ namespace wb
 			this->CurrentLineNumber = CurrentLineNumber;
 		}
 
-		inline XmlElement* XmlParser::GetCurrentElement()
+		inline shared_ptr<XmlElement> XmlParser::GetCurrentElement()
 		{
 			for (int ii = (int)NodeStack.size() - 1; ii >= 0; ii--)
-				if (NodeStack[ii]->IsElement()) return (XmlElement*)NodeStack[ii];
+				if (NodeStack[ii]->IsElement()) return dynamic_pointer_cast<XmlElement>(NodeStack[ii]);
 			return nullptr;
 		}
 
-		inline XmlNode* XmlParser::GetCurrentNode()
+		inline shared_ptr<XmlNode> XmlParser::GetCurrentNode()
 		{
 			if (NodeStack.size() == 0) return nullptr;
 			return NodeStack[NodeStack.size() - 1];
@@ -96,7 +102,7 @@ namespace wb
 
 			CurrentState = State::Initializing;
 
-			XmlElement* pCurrent = GetCurrentElement();
+			auto pCurrent = GetCurrentElement();
 			if (pCurrent != nullptr)
 			{
 				throw FormatException("Badly formed XML (no closing tag for '" + pCurrent->LocalName + "' from " + pCurrent->SourceLocation + extra + ")");
@@ -187,19 +193,11 @@ namespace wb
 			return true;
 		}
 
-		inline void XmlParser::StartNewChild(XmlNode* pNewNode)
-		{
-			try
-			{
-				pNewNode->SourceLocation = GetSource();
-				GetCurrentElement()->Children.push_back(pNewNode);
-				NodeStack.push_back(pNewNode);
-			}
-			catch (...)
-			{
-				delete pNewNode;
-				throw;
-			}
+		inline void XmlParser::StartNewChild(shared_ptr<XmlNode> pNewNode)
+		{			
+			pNewNode->SourceLocation = GetSource();
+			GetCurrentElement()->Children.push_back(pNewNode);
+			NodeStack.push_back(pNewNode);			
 		}
 
 		inline std::unique_ptr<XmlDocument> XmlParser::OnCloseElement(bool ClosingTag)
@@ -209,7 +207,7 @@ namespace wb
 			if (NodeStack.size() == 0)
 				throw FormatException("Badly formed XML (illegal closing tag at top-level at " + GetSource() + ")");
 
-			XmlElement* pElement = GetCurrentElement();
+			auto pElement = GetCurrentElement();
 			if (ClosingTag && pElement->LocalName != CurrentKey)
 				throw FormatException("Badly formed XML (mismatched closing tag '" + CurrentKey + "' at " + GetSource() + " found inside element '" + pElement->LocalName + "' from " + pElement->SourceLocation + ")");			
 			CurrentKey.clear();
@@ -263,7 +261,7 @@ namespace wb
 								throw FormatException("Expected XML opening tag at top-level at " + GetSource() + ".");
 
 							// A character other than < or whitespace has been found inside the element.  Must be text!
-							StartNewChild(new XmlText());
+							StartNewChild(make_shared<XmlText>());
 							CurrentState = State::ParsingPCDATA;
 							BWhitespace = 0;
 							break;
@@ -317,7 +315,7 @@ namespace wb
 								if (IsNextEqual("[CDATA[")) {
 									for (int ii = 0; ii < cdata_len; ii++) Advance();
 									if (pCurrentDoc == nullptr) throw FormatException("Expected top-level element at " + GetSource() + ".");									
-									StartNewChild(new XmlText());
+									StartNewChild(make_shared<XmlText>());
 									CurrentState = State::ParsingCDATA;
 									continue;
 								}
@@ -349,19 +347,12 @@ namespace wb
 								if (pCurrentDoc == nullptr)
 								{
 									pCurrentDoc = std::unique_ptr<XmlDocument>(new XmlDocument());
-									XmlElement* pRoot = new XmlElement();
-									try {
-										pRoot->SourceLocation = GetSource();
-										pCurrentDoc->Children.push_back(pRoot);										
-									}
-									catch (...)
-									{
-										delete pRoot;
-										throw;
-									}
+									auto pRoot = make_shared<XmlElement>();									
+									pRoot->SourceLocation = GetSource();
+									pCurrentDoc->Children.push_back(pRoot);
 									NodeStack.push_back(pRoot);
 								}
-								else StartNewChild(new XmlElement());
+								else StartNewChild(make_shared<XmlElement>());
 								CurrentState = State::ParsingOpeningTag;
 							}
 						}
@@ -470,7 +461,7 @@ namespace wb
 			// has been verified as not a special indicator (such as <!-- for a comment, <? for an
 			// XML declaration, etc.).
 
-			XmlElement* pElement = GetCurrentElement();
+			auto pElement = GetCurrentElement();
 			while (Need(1))
 			{
 				if (IsWhitespace(Current)) {
@@ -556,21 +547,13 @@ namespace wb
 				if (Current == QuoteChar)
 				{
 					Advance();
-					XmlElement* pElement = GetCurrentElement();
+					auto pElement = GetCurrentElement();
 					if (pElement->FindAttribute(CurrentKey.c_str()) != nullptr)
 						throw FormatException("Duplicate attribute '" + CurrentKey + "' found in XML tag '" + pElement->LocalName + "' at " + GetSource() + ".");
-					XmlAttribute* pNewAttr = new XmlAttribute();
-					try
-					{
-						pNewAttr->Name = CurrentKey;
-						pNewAttr->Value = CurrentValue;
-						pElement->Attributes.push_back(pNewAttr);
-					}
-					catch (...)
-					{
-						delete pNewAttr;
-						throw;
-					}
+					auto pNewAttr = make_shared<XmlAttribute>();					
+					pNewAttr->Name = CurrentKey;
+					pNewAttr->Value = CurrentValue;
+					pElement->Attributes.push_back(pNewAttr);
 					CurrentKey.clear();
 					CurrentValue.clear();
 					return true;
@@ -659,9 +642,9 @@ namespace wb
 
 		inline bool XmlParser::ParsePCDATA()
 		{
-			XmlNode* pNode = GetCurrentNode();
+			auto pNode = GetCurrentNode();
 			if (pNode->GetType() != XmlNode::Type::Text) throw Exception("ParsePCDATA() expected XmlText node as current.");
-			XmlText* pText = (XmlText*)pNode;
+			auto pText = dynamic_pointer_cast<XmlText>(pNode);
 			
 			while (Need(1))
 			{
@@ -745,7 +728,7 @@ namespace wb
 		{
 			// Assumes we have already parsed the <![CDATA[ characters.
 			// Parse until we find the CEND sequence:   ]]>			
-			XmlText* pText = (XmlText*)GetCurrentNode();
+			auto pText = dynamic_pointer_cast<XmlText>(GetCurrentNode());
 			while (Need(3))
 			{
 				if (Current == ']' && pNext[0] == ']' && pNext[1] == '>')
@@ -761,7 +744,7 @@ namespace wb
 	}
 }
 
-#endif	// __wbXmlParserImpl_v4_h__
+#endif	// __wbXmlParserImpl_v5_h__
 
 //	End of XmlParserImpl.h
 

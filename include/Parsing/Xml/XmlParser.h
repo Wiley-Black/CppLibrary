@@ -1,6 +1,6 @@
 /////////
-//	XML Parser (Generation 4)
-//	Copyright (C) 2010-2014 by Wiley Black
+//	XML Parser (Generation 5)
+//	Copyright (C) 2010-2022 by Wiley Black
 ////
 //	A simplified XML Parser which operates in a single-pass and
 //	uses a minimal dependency set.  The parser utilizes linked lists
@@ -23,8 +23,8 @@
 //		- Support for comment parsing (comments are discarded)
 ////
 
-#ifndef __wbXmlParser_v4_h__
-#define __wbXmlParser_v4_h__
+#ifndef __wbXmlParser_v5_h__
+#define __wbXmlParser_v5_h__
 
 /** Table of Contents **/
 
@@ -49,9 +49,9 @@ namespace wb
 	{
 		class XmlParser
 		{
-			XmlElement* GetCurrentElement();
-			XmlNode* GetCurrentNode();			
-			void StartNewChild(XmlNode* pChild);
+			shared_ptr<XmlElement> GetCurrentElement();
+			shared_ptr<XmlNode> GetCurrentNode();			
+			void StartNewChild(shared_ptr<XmlNode> pChild);
 			unique_ptr<XmlDocument> OnCloseElement(bool ClosingTag);
 
 			bool IsWhitespace(char ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'; }
@@ -75,7 +75,7 @@ namespace wb
 			/// element [0], if the document has been started.  The latest child being parsed is 
 			/// element [N].
 			/// </summary>
-			vector<XmlNode*> NodeStack;
+			vector<shared_ptr<XmlNode>> NodeStack;
 
 			string CurrentSource;
 			int CurrentLineNumber;
@@ -150,7 +150,10 @@ namespace wb
 			XmlParser();
 			~XmlParser();						
 
-			/// <summary>Parses the stream, which must contain an XML document or fragment.  An exception is thrown on error.</summary>
+			/// <summary>Parses the stream, which must contain an XML document or fragment.  A complete XML document or fragment must be
+			/// contained in the stream or an exception will be thrown.  The stream will only be retrieved up to the completion of an 
+			/// XML document or fragment, and there may be additional unparsed content following the XML document or fragment.  That is, 
+			/// GetPosition() may be less than GetLength().  An exception is thrown on error.</summary>
 			/// <returns>An XmlDocument parsed from the provided string.</returns>
 			static unique_ptr<XmlDocument> Parse(wb::io::Stream& stream, const string& sSourceFilename = "");
 
@@ -160,7 +163,7 @@ namespace wb
 			static unique_ptr<XmlDocument> Parse(const string& str, const string& sSourceFilename = "");
 
 			/// <summary>Parses the file, which must contain an XML document or fragment.  An exception is thrown on error.
-			/// A complete XML document or fragmant must be contained in the file or an exception will be thrown.</summary>
+			/// A complete XML document or fragment must be contained in the file or an exception will be thrown.</summary>
 			/// <returns>An XmlDocument parsed from the provided string.</returns>
 			static unique_ptr<XmlDocument> ParseFile(const string& sSourceFilename);
 

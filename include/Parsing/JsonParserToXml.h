@@ -7,7 +7,9 @@
 
 /** Dependencies **/
 
-#include "Xml.h"
+#include "../IO/Streams.h"
+#include "../IO/MemoryStream.h"
+#include "Xml/Xml.h"
 
 /** Content **/
 
@@ -23,8 +25,8 @@ namespace wb
 			bool IsWhitespace(char ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'; }
 			string ParseString(const char *&psz);
 
-			void ParseValue(const char *&psz, XmlNode *pParent, string& NameText, XmlDocument* pDoc, bool AsElement = false);
-			void ParseObject(const char *&psz, XmlNode *pNode, XmlDocument* pDoc);
+			void ParseValue(const char *&psz, XmlNode *pParent, string& NameText, bool AsElement = false);
+			void ParseObject(const char *&psz, XmlNode* pNode);
 
 			string CurrentSource;
 			int CurrentLineNumber;
@@ -37,11 +39,11 @@ namespace wb
 
 			/// <summary>Parses the string, which must contain a JSON fragment.  An exception is thrown on error.</summary>
 			/// <returns>The returned XmlDocument has been allocated with new and should be delete'd when done.</returns>
-			XmlDocument *ParseAsXml(const char *psz, const string& sSourceFilename = "");
+			unique_ptr<XmlDocument> ParseAsXml(const char *psz, const string& sSourceFilename = "");
 
 			/// <summary>Parses the stream, which must contain a JSON fragment.  An exception is thrown on error.</summary>
 			/// <returns>The returned XmlDocument has been allocated with new and should be delete'd when done.</returns>			
-			XmlDocument *ParseAsXml(wb::io::Stream& stream, const string& sSourceFilename = "");
+			unique_ptr<XmlDocument> ParseAsXml(wb::io::Stream& stream, const string& sSourceFilename = "");
 		};
 	
 		/** JsonParser Implementation **/
@@ -68,7 +70,7 @@ namespace wb
 			}
 		}
 
-		inline XmlDocument* JsonParser::ParseAsXml(wb::io::Stream& stream, const string& sSourceFilename)
+		inline unique_ptr<XmlDocument> JsonParser::ParseAsXml(wb::io::Stream& stream, const string& sSourceFilename)
 		{
 			// Optimization: Could avoid storing the whole thing in memory and parse as we go...
 			wb::io::MemoryStream ms;
@@ -79,7 +81,7 @@ namespace wb
 			return ParseAsXml((const char *)ms.GetDirectAccess(0), sSourceFilename);
 		}
 
-		inline XmlDocument* JsonParser::ParseAsXml(const char *psz, const string& sSourceFilename)
+		inline unique_ptr<XmlDocument> JsonParser::ParseAsXml(const char *psz, const string& sSourceFilename)
 		{
 			CurrentSource = sSourceFilename;
 			CurrentLineNumber = 1;
@@ -103,17 +105,9 @@ namespace wb
 				}
 			}
 
-			XmlDocument *pDocument = new XmlDocument();
-			try
-			{
-				pDocument->SourceLocation = CurrentSource;
-				ParseObject(psz, pDocument, pDocument);
-			}
-			catch (std::exception&)
-			{
-				delete pDocument;
-				throw;
-			}
+			auto pDocument = make_unique<XmlDocument>();
+			pDocument->SourceLocation = CurrentSource;
+			ParseObject(psz, pDocument.get());
 			return pDocument;
 		}
 		
@@ -152,7 +146,7 @@ namespace wb
 			}
 		}
 
-		inline void JsonParser::ParseValue(const char *&psz, XmlNode *pParent, string& NameText, XmlDocument* pDoc, bool AsElement /*= false*/)
+		inline void JsonParser::ParseValue(const char *&psz, XmlNode *pParent, string& NameText, bool AsElement /*= false*/)
 		{
 			// Precondition: name and colon have been parsed.  At start of value.
 			// Postcondition: past value, but haven't parsed the comma or closing brace yet.
@@ -228,7 +222,7 @@ namespace wb
 					{
 						SkipWhitespace(psz);
 						if (*psz == ']') { psz++; break; }												
-						ParseValue(psz, pParent, NameText, pDoc, true);
+						ParseValue(psz, pParent, NameText, true);
 						SkipWhitespace(psz);
 						if (*psz == ',') { psz++; continue; }
 						if (*psz == ']') { psz++; break; }
@@ -241,10 +235,10 @@ namespace wb
 				if (*psz == '{')
 				{
 					psz ++;
-					XmlElement* pChild = pDoc->CreateElement(NameText.c_str());
+					auto pChild = make_shared<XmlElement>(NameText.c_str());
 					pChild->SourceLocation = GetSource();
 					pParent->AppendChild(pChild);
-					ParseObject(psz, pChild, pDoc);
+					ParseObject(psz, pChild.get());
 					return;
 				}
 
@@ -271,7 +265,7 @@ namespace wb
 				if (StartsWithNoCase(psz, "null"))
 				{
 					psz += 4;
-					XmlElement* pEntry = pDoc->CreateElement(NameText.c_str());
+					auto pEntry = make_shared<XmlElement>(NameText.c_str());
 					pEntry->SourceLocation = GetSource();
 					pParent->AppendChild(pEntry);
 					return;
@@ -281,7 +275,7 @@ namespace wb
 			}
 		}
 
-		inline void JsonParser::ParseObject(const char *&psz, XmlNode *pNode, XmlDocument* pDoc)
+		inline void JsonParser::ParseObject(const char *&psz, XmlNode* pNode)
 		{
 			// Precondition: Assumes that the opening brace of the object has been parsed, and that the pointer is at the beginning of object content.
 			// Postcondition: ParseNode() returns after the closing brace has been parsed (assuming no errors).			
@@ -313,7 +307,7 @@ namespace wb
 							psz ++;
 							
 							// We have reached the value side of the name:value pair.
-							ParseValue(psz, pNode, NameText, pDoc);
+							ParseValue(psz, pNode, NameText);
 							break;
 						}
 

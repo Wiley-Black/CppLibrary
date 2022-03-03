@@ -113,8 +113,8 @@ TEST(Library, XML)
 	ASSERT_TRUE(pRoot->Elements()[2]->Children.size() == 1) << xml_fail_msg(*pDoc, id);
 	ASSERT_TRUE(pRoot->Elements()[0]->Children[0]->GetType() == XmlNode::Type::Text) << xml_fail_msg(*pDoc, id);
 	ASSERT_TRUE(pRoot->Elements()[2]->Children[0]->GetType() == XmlNode::Type::Text) << xml_fail_msg(*pDoc, id);
-	ASSERT_TRUE(IsEqual(Trim(((XmlText*)pRoot->Elements()[0]->Children[0])->Text), "And some text.")) << xml_fail_msg(*pDoc, id);
-	ASSERT_TRUE(IsEqual(Trim(((XmlText*)pRoot->Elements()[2]->Children[0])->Text), "<text>")) << xml_fail_msg(*pDoc, id);
+	ASSERT_TRUE(IsEqual(Trim(dynamic_pointer_cast<XmlText>(pRoot->Elements()[0]->Children[0])->Text), "And some text.")) << xml_fail_msg(*pDoc, id);
+	ASSERT_TRUE(IsEqual(Trim(dynamic_pointer_cast<XmlText>(pRoot->Elements()[2]->Children[0])->Text), "<text>")) << xml_fail_msg(*pDoc, id);
 
 	std::cout << "UnitTesting: Library.XML valid and not-well-formed file tests starting..." << "\n";
 
