@@ -85,14 +85,20 @@ namespace wb
 		#undef min
 		#undef max		
 
+		#ifdef __CUDACC__
+		#define __nlc_keywords__ __host__ __device__ __forceinline__
+		#else
+		#define __nlc_keywords__ inline
+		#endif		
+
 		// Note: can't be used for floating-point types (because the C++ standard does not allow template non-type arguments
 		// of floating-point types), and for integral types lowest = min in all cases.
 		template<typename T, T min_value, T max_value> class numeric_limits_core
 		{
-		public:
-			static constexpr __host__ __device__ __forceinline__ T min() noexcept { return min_value; }
-			static constexpr __host__ __device__ __forceinline__ T lowest() noexcept { return min_value; }
-			static constexpr __host__ __device__ __forceinline__ T max() noexcept { return max_value; }
+		public:			
+			static constexpr __nlc_keywords__ T min() noexcept { return min_value; }
+			static constexpr __nlc_keywords__ T lowest() noexcept { return min_value; }
+			static constexpr __nlc_keywords__ T max() noexcept { return max_value; }
 		};
 
 		template<typename T> class numeric_limits { };
@@ -107,21 +113,21 @@ namespace wb
 		template<> class numeric_limits<UInt64> : public numeric_limits_core <UInt64, 0, 18446744073709551615ULL> { };
 		template<> class numeric_limits<float> {
 		public:
-			static constexpr __host__ __device__ __forceinline__ float min() noexcept { return FLT_MIN; }
-			static constexpr __host__ __device__ __forceinline__ float lowest() noexcept { return -FLT_MAX; }
-			static constexpr __host__ __device__ __forceinline__ float max() noexcept { return FLT_MAX; }
+			static constexpr __nlc_keywords__ float min() noexcept { return FLT_MIN; }
+			static constexpr __nlc_keywords__ float lowest() noexcept { return -FLT_MAX; }
+			static constexpr __nlc_keywords__ float max() noexcept { return FLT_MAX; }
 		};
 		template<> class numeric_limits<double> {
 		public:
-			static constexpr __host__ __device__ __forceinline__ double min() noexcept { return DBL_MIN; }
-			static constexpr __host__ __device__ __forceinline__ double lowest() noexcept { return -DBL_MAX; }
-			static constexpr __host__ __device__ __forceinline__ double max() noexcept { return DBL_MAX; }
+			static constexpr __nlc_keywords__ double min() noexcept { return DBL_MIN; }
+			static constexpr __nlc_keywords__ double lowest() noexcept { return -DBL_MAX; }
+			static constexpr __nlc_keywords__ double max() noexcept { return DBL_MAX; }
 		};
 		template<> class numeric_limits<long double> {
 		public:
-			static constexpr __host__ __device__ __forceinline__ long double min() noexcept { return LDBL_MIN; }
-			static constexpr __host__ __device__ __forceinline__ long double lowest() noexcept { return -LDBL_MAX; }
-			static constexpr __host__ __device__ __forceinline__ long double max() noexcept { return LDBL_MAX; }
+			static constexpr __nlc_keywords__ long double min() noexcept { return LDBL_MIN; }
+			static constexpr __nlc_keywords__ long double lowest() noexcept { return -LDBL_MAX; }
+			static constexpr __nlc_keywords__ long double max() noexcept { return LDBL_MAX; }
 		};
 
 		#pragma endregion
@@ -674,12 +680,29 @@ namespace wb
 
 		#else			// CUDA_Support
 
+		// Define some types and constants from CUDA for convenience...
+		// 
 		//typedef void* cudaStream_t;		
 
-		struct float2 { float x; float y; float __cuda_gnu_arm_ice_workaround[0]; };
+		struct float2 { float x; float y; /*float __cuda_gnu_arm_ice_workaround[0];*/ };
 		struct double2 { double x, y; };
 		typedef float2 cuFloatComplex;
 		typedef double2 cuDoubleComplex;
+
+		typedef enum
+		{
+			NPPI_INTER_UNDEFINED = 0,
+			NPPI_INTER_NN = 1,        /**<  Nearest neighbor filtering. */
+			NPPI_INTER_LINEAR = 2,        /**<  Linear interpolation. */
+			NPPI_INTER_CUBIC = 4,        /**<  Cubic interpolation. */
+			NPPI_INTER_CUBIC2P_BSPLINE,              /**<  Two-parameter cubic filter (B=1, C=0) */
+			NPPI_INTER_CUBIC2P_CATMULLROM,           /**<  Two-parameter cubic filter (B=0, C=1/2) */
+			NPPI_INTER_CUBIC2P_B05C03,               /**<  Two-parameter cubic filter (B=1/2, C=3/10) */
+			NPPI_INTER_SUPER = 8,        /**<  Super sampling. */
+			NPPI_INTER_LANCZOS = 16,       /**<  Lanczos filtering. */
+			NPPI_INTER_LANCZOS3_ADVANCED = 17,       /**<  Generic Lanczos filtering with order 3. */
+			NPPI_SMOOTH_EDGE = (int)0x8000000 /**<  Smooth edge filtering. */
+		} NppiInterpolationMode;
 
 		/// <summary>
 		/// Provide a placeholder version when not compiling with NVCC.
@@ -703,8 +726,15 @@ namespace wb
 		public:			
 
 			static GPUStream New() {
-				return GPUStream;
+				return GPUStream();
 			}
+
+			static GPUStream None()
+			{
+				return GPUStream();
+			}
+
+			bool IsNone() const { return true; }
 
 			GPUStream(const GPUStream& fromStream) = default;			
 			GPUStream(GPUStream&& mvStream) noexcept = default;

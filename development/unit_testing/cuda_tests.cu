@@ -2,6 +2,8 @@
 #include "wbComplete.h"
 #include <iostream>
 
+#ifdef CUDA_Support
+
 using namespace wb;
 using namespace std;
 static const double M_PI = 3.14159265358979323846264338327950288;
@@ -418,4 +420,6 @@ bool CUDAImageProcessingTesting()
 
     FINISH_TEST();
 }
+
+#endif
 

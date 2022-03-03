@@ -31,6 +31,7 @@ namespace wb
 			}
 			else
 			{
+				#ifdef CUDA_Support
 				auto formatSrc = m_DeviceData.GetCudaFormat();
 				dst.ToDevice();
 				auto formatDst = dst.m_DeviceData.GetCudaFormat();
@@ -47,6 +48,9 @@ namespace wb
 				);
 				AfterKernelLaunch();
 				return dst;
+				#else
+				throw NotSupportedException();
+				#endif
 			}
 		}
 
@@ -57,9 +61,13 @@ namespace wb
 		template<> inline Image<float> Image<UInt16>::ConvertTo(HostFlags Flags)
 		{
 			if (Flags == HostFlags::Retain) Flags = GetHostFlags();
+			#ifdef CUDA_Support
 			auto ret = WouldModifyInHost() ?
 				Image<float>::NewHostImage(Width(), Height(), Stream(), Flags)
 				: Image<float>::NewDeviceImage(Width(), Height(), Stream(), Flags);
+			#else
+			auto ret = Image<float>::NewHostImage(Width(), Height(), Stream(), Flags);
+			#endif
 			ConvertTo(ret);
 			return ret;
 		}
@@ -248,9 +256,13 @@ namespace wb
 		template<> inline Image<byte> Image<float>::ConvertTo(Image<float>::Range SrcValueRange, HostFlags Flags)
 		{
 			if (Flags == HostFlags::Retain) Flags = GetHostFlags();
+			#ifdef CUDA_Support
 			auto ret = WouldModifyInHost() ?
 				Image<byte>::NewHostImage(Width(), Height(), Stream(), Flags)
 				: Image<byte>::NewDeviceImage(Width(), Height(), Stream(), Flags);
+			#else		
+			auto ret = Image<byte>::NewHostImage(Width(), Height(), Stream(), Flags);
+			#endif
 			ConvertTo(ret, SrcValueRange);
 			return ret;
 		}
@@ -293,9 +305,13 @@ namespace wb
 		template<> inline Image<RGBAPixel> Image<RGBPixel>::ConvertTo(byte Alpha, HostFlags Flags)
 		{
 			if (Flags == HostFlags::Retain) Flags = m_HostData.GetFlags();
+			#ifdef CUDA_Support
 			auto ret = WouldModifyInHost() ?
 				Image<RGBAPixel>::NewHostImage(Width(), Height(), Stream(), Flags)
 				: Image<RGBAPixel>::NewDeviceImage(Width(), Height(), Stream(), Flags);
+			#else
+			auto ret = Image<RGBAPixel>::NewHostImage(Width(), Height(), Stream(), Flags);
+			#endif
 			ConvertTo(ret, Alpha);
 			return ret;
 		}
@@ -328,9 +344,13 @@ namespace wb
 		template<typename NewPixelType> Image<NewPixelType> RGBColorImage<PixelType, FinalType>::ConvertToGrayscale(HostFlags Flags)
 		{
 			if (Flags == HostFlags::Retain) Flags = m_HostData.GetFlags();
+			#ifdef CUDA_Support
 			auto ret = WouldModifyInHost() ?
 				Image<NewPixelType>::NewHostImage(Width(), Height(), Stream(), Flags)
 				: Image<NewPixelType>::NewDeviceImage(Width(), Height(), Stream(), Flags);
+			#else
+			auto ret = Image<NewPixelType>::NewHostImage(Width(), Height(), Stream(), Flags);
+			#endif
 			ConvertToGrayscale(ret);
 			return ret;
 		}		

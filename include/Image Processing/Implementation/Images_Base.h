@@ -254,7 +254,9 @@ namespace wb
 
 		public:
 			typedef memory::HostImageData<PixelType> HostImageData;
+			#ifdef CUDA_Support
 			typedef memory::DeviceImageData<PixelType> DeviceImageData;
+			#endif
 			typedef memory::DataState DataState;
 
 			DataState			m_DataState;		// Which ImageData is up-to-date?  Or both/neither?			
@@ -285,7 +287,9 @@ namespace wb
 
 			DataState& GetDataState() { return m_DataState; }
 			HostImageData& GetHostData() { return m_HostData; }
+			#ifdef CUDA_Support
 			DeviceImageData& GetDeviceData() { return m_DeviceData; }
+			#endif
 
 			template<typename PixelTypeDst, typename FinalTypeDst> FinalTypeDst& TypecastConvertTo(FinalTypeDst& dst);
 
@@ -537,6 +541,7 @@ namespace wb
 					ret.m_TowardHost = true;
 					return ret;
 				}
+				#ifdef CUDA_Support
 				case DataState::Device:
 				{
 					FinalType ret(m_Stream, flags);
@@ -548,6 +553,7 @@ namespace wb
 					ret.m_TowardHost = true;
 					return ret;
 				}
+				#endif
 				}
 			}
 
@@ -575,6 +581,7 @@ namespace wb
 					ret.m_TowardHost = false;
 					return ret;
 				}
+				#ifdef CUDA_Support
 				case DataState::HostAndDevice:
 				case DataState::Device:
 				{
@@ -587,6 +594,7 @@ namespace wb
 					ret.m_TowardHost = false;
 					return ret;
 				}
+				#endif
 				}
 			}
 
@@ -615,12 +623,14 @@ namespace wb
 					if (NeedWritable) m_DataState = DataState::Host;
 				case DataState::Host:
 					return;
+				#ifdef CUDA_Support
 				case DataState::Device:
 					StartAsync(m_Stream);
 					m_HostData.Allocate(m_DeviceData.m_Width, m_DeviceData.m_Height, NeedWritable);
 					m_DeviceData.AsyncCopyImageTo(m_HostData, m_Stream);
 					if (NeedWritable) m_DataState = DataState::Host; else m_DataState = DataState::HostAndDevice;
 					return;
+				#endif
 				default: throw NotSupportedException();
 				}
 			}
@@ -634,6 +644,7 @@ namespace wb
 			/// </summary>
 			virtual void ToDevice(bool NeedWritable = false)
 			{
+				#ifdef CUDA_Support
 				ValidateObject();
 				m_TowardHost = false;
 				switch (m_DataState)
@@ -650,6 +661,9 @@ namespace wb
 					return;
 				default: throw NotSupportedException();
 				}
+				#else
+				throw NotSupportedException();
+				#endif
 			}						
 
 			#pragma endregion
@@ -733,6 +747,7 @@ namespace wb
 			#pragma endregion
 
 			#pragma region "CUDA Helpers"
+			#ifdef CUDA_Support
 
 			/// <summary>
 			/// GetSmallOpKernelParameters() provides kernel parameters suitable for a fast, pixelwise operation.
@@ -752,6 +767,7 @@ namespace wb
 
 			cuda::img_format GetCudaFormat() const { return m_DeviceData.GetCudaFormat(); }				
 
+			#endif
 			#pragma endregion
 
 			#pragma region "Properties"
@@ -761,8 +777,10 @@ namespace wb
 				case DataState::Host:
 				case DataState::HostAndDevice:
 					return m_HostData.m_Width;
+				#ifdef CUDA_Support
 				case DataState::Device:
 					return m_DeviceData.m_Width;
+				#endif
 				default: return 0;
 				}
 			}
@@ -772,8 +790,10 @@ namespace wb
 				case DataState::Host:
 				case DataState::HostAndDevice:
 					return m_HostData.m_Height;
+				#ifdef CUDA_Support
 				case DataState::Device:
 					return m_DeviceData.m_Height;
+				#endif
 				default: return 0;
 				}
 			}
@@ -833,6 +853,7 @@ namespace wb
 				return *(PixelType*)(((byte*)m_HostData.m_pData) + xx * sizeof(PixelType) + yy * m_HostData.m_Stride);
 			}
 
+			#ifdef CUDA_Support
 			PixelType* GetDeviceDataPtr() {
 				if (m_DataState != DataState::Device && m_DataState != DataState::HostAndDevice)
 					throw NotSupportedException("Image data has not been transferred to GPU before trying to access device pointer.");
@@ -844,6 +865,7 @@ namespace wb
 					throw NotSupportedException("Image data has not been transferred to GPU before trying to access device pointer.");
 				return m_DeviceData.m_pData;
 			}
+			#endif
 
 			#if 0
 			double GetPixelInterpolated(double X, double Y) const
@@ -875,10 +897,14 @@ namespace wb
 				}
 				else
 				{
+					#ifdef CUDA_Support
 					StartAsync();
 					cudaThrowable(cudaMemsetAsync(m_DeviceData.m_pData, 0,
 						m_DeviceData.m_Stride * m_DeviceData.m_Height, m_Stream));
 					// AfterKernelLaunch(); unnecessarily, I believe, because cudaMemsetAsync() will check for errors.
+					#else
+					throw NotSupportedException();
+					#endif
 				}
 			}
 
@@ -897,6 +923,7 @@ namespace wb
 				}
 				else
 				{
+					#ifdef CUDA_Support
 					dim3 blocks, threads;
 					GetSmallOpKernelParameters(blocks, threads);
 
@@ -907,8 +934,30 @@ namespace wb
 						value
 					);
 					AfterKernelLaunch();
+					#else
+					throw NotSupportedException();
+					#endif
 				}
 			}
+
+			#ifdef CUDA_Support
+			#define InPlaceOperatorCodeTemplate_1Img1Scalar_Device(KernelName)	\
+				{		\
+					auto formatA = m_DeviceData.GetCudaFormat();			\
+						\
+					dim3 blocks, threads;									\
+					GetSmallOpKernelParameters(blocks, threads);			\
+						\
+					StartAsync();											\
+					Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream, \
+						m_DeviceData.m_pData, formatA, \
+						rhs													\
+					);	\
+					AfterKernelLaunch();									\
+				}
+			#else
+			#define InPlaceOperatorCodeTemplate_1Img1Scalar_Device(KernelName) { throw NotSupportedException(); }
+			#endif
 
 			#define InPlaceOperatorCodeTemplate_1Img1Scalar(KernelName, HostOperation)		\
 				{			\
@@ -921,20 +970,7 @@ namespace wb
 							for (int xx = 0; xx < m_HostData.m_Width; xx++, pA++) { HostOperation; }		\
 						}	\
 					}		\
-					else	\
-					{		\
-						auto formatA = m_DeviceData.GetCudaFormat();			\
-							\
-						dim3 blocks, threads;									\
-						GetSmallOpKernelParameters(blocks, threads);			\
-							\
-						StartAsync();											\
-						Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream,	\
-							m_DeviceData.m_pData, formatA,						\
-							rhs													\
-						);	\
-						AfterKernelLaunch();									\
-					}		\
+					else InPlaceOperatorCodeTemplate_1Img1Scalar_Device(KernelName);						\
 					return *this;												\
 				}
 
@@ -943,6 +979,29 @@ namespace wb
 			template<typename ScalarType> BaseImage& operator*=(ScalarType rhs) { InPlaceOperatorCodeTemplate_1Img1Scalar(cuda::Kernel_MulScalarInPlace, { *pA *= rhs; }); }
 			template<typename ScalarType> BaseImage& operator/=(ScalarType rhs) { InPlaceOperatorCodeTemplate_1Img1Scalar(cuda::Kernel_DivScalarInPlace, { *pA /= rhs; }); }
 			#undef InPlaceOperatorCodeTemplate_1Img1Scalar
+
+			#ifdef CUDA_Support
+			#define InPlaceOperatorCodeTemplate_2Img_Device(KernelName)		\
+				{															\
+					auto formatA = m_DeviceData.GetCudaFormat();			\
+					rhs.ToDevice();											\
+					auto formatB = rhs.m_DeviceData.GetCudaFormat();		\
+					if (formatA.size() != formatB.size()) throw FormatException("Image sizes must match for this operation.");			\
+						\
+					dim3 blocks, threads;									\
+					GetSmallOpKernelParameters(blocks, threads);			\
+						\
+					rhs.StartAsync(m_Stream);								\
+					StartAsync();											\
+					Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream,	\
+						m_DeviceData.m_pData, formatA,						\
+						rhs.GetDeviceDataPtr(), formatB						\
+					);	\
+					AfterKernelLaunch();									\
+				}
+			#else
+			#define InPlaceOperatorCodeTemplate_2Img_Device(KernelName) { throw NotSupportedException(); }
+			#endif
 
 			#define InPlaceOperatorCodeTemplate_2Img(KernelName, HostOperation)		\
 				{			\
@@ -956,24 +1015,7 @@ namespace wb
 							for (int xx = 0; xx < m_HostData.m_Width; xx++, pA++, pB++) { HostOperation; }		\
 						}	\
 					}		\
-					else	\
-					{		\
-						auto formatA = m_DeviceData.GetCudaFormat();			\
-						rhs.ToDevice();											\
-						auto formatB = rhs.m_DeviceData.GetCudaFormat();		\
-						if (formatA.size() != formatB.size()) throw FormatException("Image sizes must match for this operation.");			\
-							\
-						dim3 blocks, threads;									\
-						GetSmallOpKernelParameters(blocks, threads);			\
-							\
-						rhs.StartAsync(m_Stream);								\
-						StartAsync();											\
-						Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream,	\
-							m_DeviceData.m_pData, formatA,						\
-							rhs.GetDeviceDataPtr(), formatB						\
-						);	\
-						AfterKernelLaunch();									\
-					}		\
+					else InPlaceOperatorCodeTemplate_2Img_Device(KernelName);	\
 					return *this;												\
 				}
 
@@ -983,6 +1025,33 @@ namespace wb
 			BaseImage& operator*=(FinalType& rhs) { InPlaceOperatorCodeTemplate_2Img(cuda::Kernel_MulInPlace, { *pA *= *pB; }); }
 			BaseImage& operator/=(FinalType& rhs) { InPlaceOperatorCodeTemplate_2Img(cuda::Kernel_DivInPlace, { *pA /= *pB; }); }
 			#undef InPlaceOperatorCodeTemplate			
+
+			#ifdef CUDA_Support
+			#define NewOperatorCodeTemplate_2Img_Device(KernelName)		\
+				{		\
+					auto ret = FinalType::NewDeviceImage(m_DeviceData.m_Width, m_DeviceData.m_Height, Stream(), GetHostFlags());		\
+					auto formatA = m_DeviceData.GetCudaFormat();			\
+					rhs.ToDevice();											\
+					auto formatB = rhs.m_DeviceData.GetCudaFormat();		\
+					if (formatA.size() != formatB.size()) throw FormatException("Image sizes must match for this operation.");			\
+					auto formatResult = ret.m_DeviceData.GetCudaFormat();	\
+						\
+					dim3 blocks, threads;									\
+					GetSmallOpKernelParameters(blocks, threads);			\
+						\
+					rhs.StartAsync(m_Stream);								\
+					StartAsync();											\
+					Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream,	\
+						m_DeviceData.m_pData, formatA,						\
+						rhs.GetDeviceDataPtr(), formatB,					\
+						ret.GetDeviceDataPtr(), formatResult				\
+					);	\
+					AfterKernelLaunch();									\
+					return ret;												\
+				}
+			#else
+			#define NewOperatorCodeTemplate_2Img_Device(KernelName) { throw NotSupportedException(); }
+			#endif
 
 			#define NewOperatorCodeTemplate_2Img(KernelName, HostOperation)		\
 				{			\
@@ -999,28 +1068,7 @@ namespace wb
 						}	\
 						return ret;												\
 					}		\
-					else	\
-					{		\
-						auto ret = FinalType::NewDeviceImage(m_DeviceData.m_Width, m_DeviceData.m_Height, Stream(), GetHostFlags());		\
-						auto formatA = m_DeviceData.GetCudaFormat();			\
-						rhs.ToDevice();											\
-						auto formatB = rhs.m_DeviceData.GetCudaFormat();		\
-						if (formatA.size() != formatB.size()) throw FormatException("Image sizes must match for this operation.");			\
-						auto formatResult = ret.m_DeviceData.GetCudaFormat();	\
-							\
-						dim3 blocks, threads;									\
-						GetSmallOpKernelParameters(blocks, threads);			\
-							\
-						rhs.StartAsync(m_Stream);								\
-						StartAsync();											\
-						Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream,	\
-							m_DeviceData.m_pData, formatA,						\
-							rhs.GetDeviceDataPtr(), formatB,					\
-							ret.GetDeviceDataPtr(), formatResult				\
-						);	\
-						AfterKernelLaunch();									\
-						return ret;												\
-					}		\
+					else NewOperatorCodeTemplate_2Img_Device(KernelName);		\
 				}
 
 			// These are distinguished from the template operators above with a ScalarType because of the by-reference argument.
@@ -1029,6 +1077,24 @@ namespace wb
 			FinalType operator*(FinalType& rhs) { NewOperatorCodeTemplate_2Img(cuda::Kernel_Mul, { *pResult = *pA * *pB; }); }
 			FinalType operator/(FinalType& rhs) { NewOperatorCodeTemplate_2Img(cuda::Kernel_Div, { *pResult = *pA / *pB; }); }
 			#undef NewOperatorCodeTemplate_2Img
+
+			#ifdef CUDA_Support
+			#define InPlaceUnaryOperatorCodeTemplate_Device(KernelName)		\
+				{		\
+					auto formatA = m_DeviceData.GetCudaFormat();			\
+						\
+					dim3 blocks, threads;									\
+					GetSmallOpKernelParameters(blocks, threads);			\
+						\
+					StartAsync();											\
+					Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream,	\
+						m_DeviceData.m_pData, formatA						\
+					);	\
+					AfterKernelLaunch();									\
+				}
+			#else
+			#define InPlaceUnaryOperatorCodeTemplate_Device(KernelName) { throw NotSupportedException(); }
+			#endif
 
 			#define InPlaceUnaryOperatorCodeTemplate(KernelName, HostOperation)	\
 				{			\
@@ -1041,19 +1107,7 @@ namespace wb
 							for (int xx = 0; xx < m_HostData.m_Width; xx++, pA++) { HostOperation; }		\
 						}	\
 					}		\
-					else	\
-					{		\
-						auto formatA = m_DeviceData.GetCudaFormat();			\
-							\
-						dim3 blocks, threads;									\
-						GetSmallOpKernelParameters(blocks, threads);			\
-							\
-						StartAsync();											\
-						Launch_CUDAKernel(KernelName, blocks, threads, /*dynamic shared memory=*/ 0, m_Stream,	\
-							m_DeviceData.m_pData, formatA						\
-						);	\
-						AfterKernelLaunch();									\
-					}		\
+					else InPlaceUnaryOperatorCodeTemplate_Device(KernelName);	\
 					return *this;												\
 				}
 
@@ -1074,6 +1128,7 @@ namespace wb
 				}
 				else
 				{
+					#ifdef CUDA_Support
 					auto formatA = m_DeviceData.GetCudaFormat();
 
 					dim3 blocks, threads;
@@ -1084,6 +1139,9 @@ namespace wb
 						m_DeviceData.m_pData, formatA, MinValue, MaxValue
 					);
 					AfterKernelLaunch();
+					#else		
+					throw NotSupportedException();
+					#endif
 				}
 				return (FinalType&)*this;
 			}
@@ -1184,7 +1242,9 @@ namespace wb
 			// nondependent names.  These using declarations will resolve the issue.			
 			using base::m_DataState;
 			using base::m_HostData;
+			#ifdef CUDA_Support
 			using base::m_DeviceData;
+			#endif
 		
 		protected:
 			RealImage(GPUStream Stream, HostFlags HostFlags) : base(Stream, HostFlags) { }
@@ -1261,7 +1321,9 @@ namespace wb
 			// nondependent names.  These using declarations will resolve the issue.			
 			using base::m_DataState;
 			using base::m_HostData;
+			#ifdef CUDA_Support
 			using base::m_DeviceData;
+			#endif
 		
 		protected:
 			ComplexImage(GPUStream Stream, HostFlags HostFlags) : base(Stream, HostFlags) { }

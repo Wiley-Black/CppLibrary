@@ -135,6 +135,7 @@ namespace wb
 		#pragma endregion
 
 		#pragma region "Convolution Kernels - NPP Multiplexers"
+		#ifdef NPP_Support
 
 		namespace NPPI
 		{
@@ -221,6 +222,7 @@ namespace wb
 			};
 		}		
 
+		#endif	// NPP_Support
 		#pragma endregion
 
 		#pragma region "Convolution Implementation"

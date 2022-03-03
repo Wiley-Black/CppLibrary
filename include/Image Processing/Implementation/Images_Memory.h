@@ -458,7 +458,13 @@ namespace wb
 					{
 						if (this->m_Responsibility == DataResponsibility::RdWrR)
 						{
-							if ((m_Flags & HostFlags::Pinned) != 0) cudaThrowable(cudaFreeHost(this->m_pData));
+							if ((m_Flags & HostFlags::Pinned) != 0) {
+								#ifdef CUDA_Support
+								cudaThrowable(cudaFreeHost(this->m_pData));
+								#else
+								throw NotSupportedException("Pinned memory requires CUDA support.");
+								#endif
+							}
 							else _aligned_free(this->m_pData);
 						}
 						this->m_pData = nullptr;

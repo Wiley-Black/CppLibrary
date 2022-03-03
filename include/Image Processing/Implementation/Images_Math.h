@@ -678,6 +678,7 @@ namespace wb
 				}
 				return accum;
 			}
+			#ifdef CUDA_Support
 			case DataState::HostAndDevice:
 			case DataState::Device:
 			{
@@ -696,6 +697,7 @@ namespace wb
 				cudaThrowable(cudaMemcpy(&accum, m_Stream.GetScratch()[1].GetDevicePtr(), sizeof(SumType), cudaMemcpyDeviceToHost));
 				return accum;
 			}
+			#endif
 			default: throw Exception("Invalid data state.");
 			}
 		}
@@ -721,6 +723,7 @@ namespace wb
 				}
 				return;
 			}
+			#ifdef CUDA_Support
 			case DataState::HostAndDevice:
 			case DataState::Device:
 			{
@@ -738,6 +741,7 @@ namespace wb
 				cudaThrowable(cudaMemcpy(&dStdDev, m_Stream.GetScratch()[2].GetDevicePtr(), sizeof(double), cudaMemcpyDeviceToHost));
 				return;
 			}
+			#endif
 			default: throw Exception("Invalid data state.");
 			}
 		}
@@ -830,6 +834,7 @@ namespace wb
 				}
 				return best;
 			}
+			#ifdef CUDA_Support
 			case DataState::HostAndDevice:
 			case DataState::Device:
 			{
@@ -846,6 +851,7 @@ namespace wb
 				cudaThrowable(cudaMemcpy(&best, m_Stream.GetScratch()[1].GetDevicePtr(), sizeof(PixelType), cudaMemcpyDeviceToHost));
 				return best;
 			}
+			#endif
 			default: throw Exception("Invalid data state.");
 			}
 		}
@@ -867,6 +873,7 @@ namespace wb
 				}
 				return best;
 			}
+			#ifdef CUDA_Support
 			case DataState::HostAndDevice:
 			case DataState::Device:
 			{
@@ -883,6 +890,7 @@ namespace wb
 				cudaThrowable(cudaMemcpy(&best, m_Stream.GetScratch()[1].GetDevicePtr(), sizeof(PixelType), cudaMemcpyDeviceToHost));
 				return best;
 			}
+			#endif
 			default: throw Exception("Invalid data state.");
 			}
 		}
@@ -902,6 +910,7 @@ namespace wb
 			}
 			else
 			{
+				#ifdef CUDA_Support
 				auto formatSrc = m_DeviceData.GetCudaFormat();
 				auto formatDst = dst.GetCudaFormat();
 				if (formatSrc.size() != formatDst.size()) throw FormatException("Image sizes must match for this operation.");
@@ -914,6 +923,9 @@ namespace wb
 					GetDeviceDataPtr(), m_DeviceData.m_Stride,
 					dst.GetDeviceDataPtr(), dst.m_DeviceData.m_Stride,
 					dst.Bounds(), dst.Stream()));
+				#else
+				throw NotSupportedException();
+				#endif
 			}
 			return dst;
 		}
@@ -929,6 +941,7 @@ namespace wb
 			}
 			else
 			{
+				#ifdef CUDA_Support
 				auto formatSrc = m_DeviceData.GetCudaFormat();
 				auto formatDst = dst.GetCudaFormat();
 				if (formatSrc.size() != formatDst.size()) throw FormatException("Image sizes must match for this operation.");
@@ -941,6 +954,9 @@ namespace wb
 					GetDeviceDataPtr(), m_DeviceData.m_Stride,
 					dst.GetDeviceDataPtr(), dst.m_DeviceData.m_Stride,
 					dst.Bounds(), dst.Stream()));
+				#else
+				throw NotSupportedException();
+				#endif
 			}
 			return dst;
 		}

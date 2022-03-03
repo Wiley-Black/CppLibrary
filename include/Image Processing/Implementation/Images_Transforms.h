@@ -28,9 +28,11 @@ namespace wb
 				throw ArgumentException("Image argument to FlipVerticallyTo() must have the same size as source image.");
 
 			byte* pSrcScanline = nullptr;
-			byte* pDstScanline = nullptr;
-			cudaMemcpyKind kind = cudaMemcpyHostToHost;
+			byte* pDstScanline = nullptr;			
 			int nSrcStride, nDstStride;
+			#ifdef CUDA_Support
+			cudaMemcpyKind kind = cudaMemcpyHostToHost;
+			#endif
 
 			if (dst.ModifyInHost(*this))
 			{
@@ -41,21 +43,26 @@ namespace wb
 				{
 				case DataState::Host:
 				case DataState::HostAndDevice:
-					pSrcScanline = (byte*)GetHostScanlinePtr(0);
-					kind = cudaMemcpyHostToHost;
+					pSrcScanline = (byte*)GetHostScanlinePtr(0);					
 					nSrcStride = m_HostData.m_Stride;
+					#ifdef CUDA_Support
+					kind = cudaMemcpyHostToHost;
+					#endif
 					break;
+				#ifdef CUDA_Support
 				case DataState::Device:
 					pSrcScanline = (byte*)GetDeviceDataPtr();
 					kind = cudaMemcpyDeviceToHost;
 					nSrcStride = m_DeviceData.m_Stride;
 					break;
+				#endif		
 				default:
 					throw NotImplementedException();
 				}
 			}
 			else
 			{
+				#ifdef CUDA_Support
 				nDstStride = dst.m_DeviceData.m_Stride;
 				int dy = Height() - 1;
 				pDstScanline = ((byte*)dst.m_DeviceData.m_pData) + dy * dst.m_DeviceData.m_Stride;
@@ -66,16 +73,19 @@ namespace wb
 					pSrcScanline = (byte*)GetHostScanlinePtr(0);
 					kind = cudaMemcpyHostToHost;
 					nSrcStride = m_HostData.m_Stride;
-					break;
+					break;				
 				case DataState::HostAndDevice:
 				case DataState::Device:
 					pSrcScanline = (byte*)GetDeviceDataPtr();
 					kind = cudaMemcpyDeviceToHost;
 					nSrcStride = m_DeviceData.m_Stride;
-					break;
+					break;				
 				default:
 					throw NotImplementedException();
 				}
+				#else
+				throw NotImplementedException();
+				#endif
 			}
 
 			if (m_Stream.IsNone())
@@ -83,7 +93,11 @@ namespace wb
 				int MinStride = min(nSrcStride, nDstStride);
 				for (int sy = 0; sy < Height(); sy++)
 				{
+					#ifdef CUDA_Support
 					cudaThrowable(cudaMemcpy(pDstScanline, pSrcScanline, MinStride, kind));
+					#else
+					memcpy(pDstScanline, pSrcScanline, MinStride);
+					#endif
 
 					// Note: it is important that pSrcScanline and pDstScanline be byte* and not PixelType* for the way
 					// the following is written (since stride is specified in bytes).
@@ -91,6 +105,7 @@ namespace wb
 					pDstScanline -= nDstStride;
 				}
 			}
+			#ifdef CUDA_Support
 			else
 			{
 				dst.StartAsync(m_Stream);
@@ -107,6 +122,7 @@ namespace wb
 				}
 				// AfterKernelLaunch(); unnecessary, I believe, because cudaMemcpyAsync() returns error codes.								
 			}
+			#endif		
 			
 			return dst;
 		}
@@ -177,10 +193,12 @@ namespace wb
 				throw ArgumentException("Destination image provided to CopyTo() must be larger enough to accomodate the ROI and offset specified.");
 
 			byte* pSrc = nullptr;
-			byte* pDst = nullptr;
-			cudaMemcpyKind kind = cudaMemcpyHostToHost;
+			byte* pDst = nullptr;			
 			int nSrcStride, nDstStride;
 			bool ModifyingHost = dst.ModifyInHost(*this);
+			#ifdef CUDA_Support
+			cudaMemcpyKind kind = cudaMemcpyHostToHost;
+			#endif
 
 			if (ModifyingHost)
 			{
@@ -192,21 +210,26 @@ namespace wb
 				case DataState::Host:
 				case DataState::HostAndDevice:
 					Synchronize();
-					pSrc = (byte*)GetHostScanlinePtr(0);
-					kind = cudaMemcpyHostToHost;
+					pSrc = (byte*)GetHostScanlinePtr(0);					
 					nSrcStride = m_HostData.m_Stride;
+					#ifdef CUDA_Support
+					kind = cudaMemcpyHostToHost;
+					#endif
 					break;
+				#ifdef CUDA_Support
 				case DataState::Device:
 					pSrc = (byte*)GetDeviceDataPtr();
 					kind = cudaMemcpyDeviceToHost;
 					nSrcStride = m_DeviceData.m_Stride;
 					break;
+				#endif
 				default:
 					throw NotImplementedException();
 				}
 			}
 			else
 			{
+				#ifdef CUDA_Support
 				nDstStride = dst.m_DeviceData.m_Stride;
 				pDst = (byte*)dst.GetDeviceDataPtr();
 
@@ -227,16 +250,20 @@ namespace wb
 				default:
 					throw NotImplementedException();
 				}
+				#else
+				throw NotSupportedException();
+				#endif
 			}
 
 			pSrc += FromROI.X * sizeof(PixelType);
 			pSrc += FromROI.Y * nSrcStride;
 			pDst += ToX * sizeof(PixelType);
 			pDst += ToY * nDstStride;
-
+			
+			#ifdef CUDA_Support
 			int WidthInBytes = FromROI.Width * sizeof(PixelType);
 			if (m_Stream.IsNone())
-			{								
+			{
 				cudaThrowable(cudaMemcpy2D(pDst, nDstStride, pSrc, nSrcStride, WidthInBytes, FromROI.Height, kind));
 			}
 			else
@@ -246,6 +273,9 @@ namespace wb
 				cudaThrowable(cudaMemcpy2DAsync(pDst, nDstStride, pSrc, nSrcStride, WidthInBytes, FromROI.Height, kind, m_Stream));
 				// AfterKernelLaunch(); unnecessary, I believe, because cudaMemcpyAsync() returns error codes.								
 			}
+			#else
+			MoveMemory2D(pDst, nDstStride, pSrc, nSrcStride, FromROI.Width, FromROI.Height);
+			#endif
 
 			//if (ModifyingHost)
 			{
@@ -270,6 +300,7 @@ namespace wb
 		}
 
 		#pragma region "NPPI Multiplexors"
+		#ifdef NPP_Support
 
 		namespace NPPI
 		{
@@ -316,6 +347,7 @@ namespace wb
 			};
 		}
 
+		#endif		// NPP_Support
 		#pragma endregion
 
 	}// namespace images
