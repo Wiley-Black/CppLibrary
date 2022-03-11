@@ -21,31 +21,103 @@
 namespace wb
 {
 	namespace xml
-	{				
-		/** XmlParser Implementation **/
-		
-		inline XmlParser::XmlParser()
+	{
+		/** StreamParser Implementation **/
+
+		template<int MaxLoading> 
+		inline StreamParser<MaxLoading>::StreamParser()
 			: 
-			BWhitespace(0),
 			Current(0),
 			CurrentLineNumber(-1),
-			QuoteChar(0),
 			pCurrentStream(nullptr)
 		{
 			Loaded = 0;
-			CurrentState = State::Unknown;
 			pNext = new char[MaxLoading];			// Technically could be MaxLoading-1, but allowing the 1 byte for buffer.
 			if (pNext == nullptr) throw OutOfMemoryException();
-			CurrentState = State::Initializing;
 		}
 
-		inline XmlParser::~XmlParser()
+		template<int MaxLoading>
+		inline StreamParser<MaxLoading>::~StreamParser()
 		{
 			if (pNext != nullptr)
 			{
 				delete[] pNext;
 				pNext = nullptr;
 			}
+		}
+
+		template<int MaxLoading>
+		inline string StreamParser<MaxLoading>::GetSource()
+		{
+			if (CurrentSource.length() < 1) return "line " + ::std::to_string(CurrentLineNumber);
+			return CurrentSource + ":" + ::std::to_string(CurrentLineNumber);
+		}
+
+		template<int MaxLoading>
+		inline bool StreamParser<MaxLoading>::Need(int NeedLoaded)
+		{
+			if (NeedLoaded < 0 || NeedLoaded > MaxLoading) throw ArgumentException("Need() parameter must be between 0 and MaxLoading.");
+			while (Loaded < NeedLoaded)
+			{
+				int value = pCurrentStream->ReadByte();
+				if (value < 0) return false;
+				if (Loaded == 0) Current = (char)value;
+				else pNext[Loaded - 1] = (char)value;
+				Loaded++;
+			}
+			return true;
+		}
+
+		template<int MaxLoading>
+		inline bool StreamParser<MaxLoading>::Advance()
+		{
+			if (Loaded >= 1 && Current == '\n') CurrentLineNumber++;
+			if (Loaded > 1)
+			{
+				Current = pNext[0];
+				// e.g. before Loaded = 4, Current | [0] [1] [2]
+				//	    after Loaded = 3, Current* | [0] [1]
+				for (int ii = 0; ii < Loaded - 2; ii++) pNext[ii] = pNext[ii + 1];
+				Loaded--;
+				return true;
+			}
+			if (Loaded == 1) Loaded = 0;		// In case we are at EOS and return false, we want Need(1) to return false.
+			int value = pCurrentStream->ReadByte();
+			if (value < 0) return false;
+			Current = (char)value;
+			Loaded = 1;
+			return true;
+		}
+
+		template<int MaxLoading>
+		inline bool StreamParser<MaxLoading>::Advance(int N)
+		{
+			for (int ii = 0; ii < N; ii++) if (!Advance()) return false;
+			return true;
+		}
+
+		template<int MaxLoading>
+		inline bool StreamParser<MaxLoading>::IsNextEqual(const string& match)
+		{
+			if (Loaded < match.length()) throw ArgumentException("Need(" + to_string(match.length()) + ") must be called before IsNextEqual() on a string of this length.");
+			for (auto ii = 0; ii < match.length(); ii++)
+				if (pNext[ii] != match[ii]) return false;
+			return true;
+		}
+
+		/** XmlParser Implementation **/
+		
+		inline XmlParser::XmlParser()
+			: 
+			BWhitespace(0),			
+			QuoteChar(0)
+		{			
+			CurrentState = State::Unknown;			
+			CurrentState = State::Initializing;
+		}
+
+		inline XmlParser::~XmlParser()
+		{
 		}
 
 		#pragma region "Alternative entry points"
@@ -109,13 +181,7 @@ namespace wb
 			}
 			
 			if (NodeStack.size() != 0) throw Exception();			// Shouldn't be allowed, top entry should always be an element.			
-		}
-
-		inline string XmlParser::GetSource()
-		{
-			if (CurrentSource.length() < 1) return "line " + ::std::to_string(CurrentLineNumber);
-			return CurrentSource + ":" + ::std::to_string(CurrentLineNumber);
-		}
+		}		
 
 		inline /*static*/ std::unique_ptr<XmlDocument> XmlParser::Parse(wb::io::Stream& stream, const string& sSourceFilename)
 		{
@@ -134,7 +200,7 @@ namespace wb
 			return pDoc;
 		}
 
-		inline /*static*/ std::unique_ptr<XmlDocument> XmlParser::Parse(const string& str, const string& sSourceFilename)
+		inline /*static*/ std::unique_ptr<XmlDocument> XmlParser::ParseString(const string& str, const string& sSourceFilename)
 		{
 			wb::io::MemoryStream ms;
 			wb::io::StringToStream(str, ms);			
@@ -149,49 +215,7 @@ namespace wb
 			return Parse(fs, sSourceFilename);
 		}
 
-		#pragma endregion		
-
-		inline bool XmlParser::Need(int NeedLoaded)
-		{
-			if (NeedLoaded < 0 || NeedLoaded > MaxLoading) throw ArgumentException("Need() parameter must be between 0 and MaxLoading.");
-			while (Loaded < NeedLoaded)
-			{
-				int value = pCurrentStream->ReadByte();
-				if (value < 0) return false;
-				if (Loaded == 0) Current = (char)value;
-				else pNext[Loaded - 1] = (char)value;
-				Loaded++;
-			}
-			return true;
-		}
-
-		inline bool XmlParser::Advance()
-		{
-			if (Loaded >= 1 && Current == '\n') CurrentLineNumber++;
-			if (Loaded > 1)
-			{
-				Current = pNext[0];
-				// e.g. before Loaded = 4, Current | [0] [1] [2]
-				//	    after Loaded = 3, Current* | [0] [1]
-				for (int ii = 0; ii < Loaded - 2; ii++) pNext[ii] = pNext[ii + 1];
-				Loaded--;
-				return true;
-			}
-			if (Loaded == 1) Loaded = 0;		// In case we are at EOS and return false, we want Need(1) to return false.
-			int value = pCurrentStream->ReadByte();
-			if (value < 0) return false;
-			Current = (char)value;
-			Loaded = 1;
-			return true;
-		}
-
-		inline bool XmlParser::IsNextEqual(const string& match)
-		{
-			if (Loaded < match.length()) throw ArgumentException("Need(" + to_string(match.length()) + ") must be called before IsNextEqual() on a string of this length.");
-			for (auto ii = 0; ii < match.length(); ii++)
-				if (pNext[ii] != match[ii]) return false;
-			return true;
-		}
+		#pragma endregion				
 
 		inline void XmlParser::StartNewChild(shared_ptr<XmlNode> pNewNode)
 		{			
@@ -601,7 +625,7 @@ namespace wb
 			}
 			while (iSemicolon >= Loaded - 1)
 			{
-				if (Loaded >= MaxLoading) throw FormatException("Unrecognized escape sequence at " + GetSource() + ".");
+				if (Loaded >= GetMaxLoading()) throw FormatException("Unrecognized escape sequence at " + GetSource() + ".");
 				if (!Need(Loaded + 1)) return false;
 				for (; iSemicolon < Loaded - 1; iSemicolon++)
 				{

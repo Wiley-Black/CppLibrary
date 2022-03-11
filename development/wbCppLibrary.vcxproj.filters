@@ -61,6 +61,12 @@
     <Filter Include="Parsing\Xml\Implementation">
       <UniqueIdentifier>{fc3da32e-9ea7-4db7-996e-a5afc6011abe}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Parsing\Yaml">
+      <UniqueIdentifier>{bca0241f-242d-4d36-a41f-b655c03f360c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parsing\Json">
+      <UniqueIdentifier>{4786867f-58c5-436e-9f15-e8c611149026}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\wbComplete.h" />
@@ -284,6 +290,18 @@
     </ClInclude>
     <ClInclude Include="..\include\Network\XMLSocket.h">
       <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Yaml\Yaml.h">
+      <Filter>Parsing\Yaml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Yaml\YamlParser.h">
+      <Filter>Parsing\Yaml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Json\Json.h">
+      <Filter>Parsing\Json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Parsing\Json\JsonParser.h">
+      <Filter>Parsing\Json</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

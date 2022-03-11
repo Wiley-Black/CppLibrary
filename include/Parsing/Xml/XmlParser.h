@@ -47,7 +47,71 @@ namespace wb
 {
 	namespace xml
 	{
-		class XmlParser
+		template<int MaxLoading = 64 /*bytes*/> class StreamParser
+		{
+		protected:
+			string CurrentSource;
+			int CurrentLineNumber;
+
+			string GetSource();
+
+			io::Stream* pCurrentStream;
+
+			char Current;
+			char* pNext;
+			int Loaded;
+
+			/// <summary>
+			/// Need() provides a character buffer with additional lookahead of up to "MaxLoading" characters for the 
+			/// XmlParser class.  If Need(1) returns true, then Current is ensured valid.  If Need(2) returns 
+			/// true, then Current and pNext[0] are valid.  If Need(3) is called, Current, pNext[0] and [1]
+			/// are valid, and so forth.  In all cases, the stream is not advanced if the requested need is 
+			/// already available.  If insufficient characters are loaded from the stream, then the stream 
+			/// advances- but in the case where Current is valid, it is not shifted from Next or further.
+			/// </summary>
+			/// <param name="NeedChars">The minimum number of characters in the Current and pNext
+			/// buffer that are needed.  The character in Current counts as 1.</param>
+			/// <returns>True if the requested characters are available.  False if the stream cannot provide
+			/// the needed characters at this time.</returns>
+			bool Need(int NeedChars);
+
+			/// <summary>
+			/// Advance() moves the current (and lookahead) buffer forward one character.  The lookahead buffer
+			/// is not guaranteed in this case, and only Current can be assumed to be valid after an Advance()
+			/// call.  If characters in the pNext buffer are needed, call Need() after Advance().
+			/// </summary>
+			/// <returns>True if the requested character is available in Current.  False if the stream cannot
+			/// provide the needed characters at this time.</returns>
+			bool Advance();
+
+			/// <summary>
+			/// Advance() moves the current (and lookahead) buffer forward N characters.  Although this overload
+			/// of Advance() moves multiple characters, it still only ensures that Current is valid after the
+			/// call.  If characters in the pNext buffer are needed, call Need() after Advance().  This overload
+			/// is useful when done examining multiple characters in the lookahead buffer, and is equivalent to
+			/// calling Advance() N times.
+			/// </summary>
+			/// <returns>True if it was possible to advance the requested number of characters.  False if the 
+			/// stream cannot provide the needed characters at this time.</returns>
+			bool Advance(int N);
+
+			/// <summary>
+			/// IsNextEqual() is a helper that operates like the IsEqual() comparison function for strings,
+			/// but uses the "pNext" buffer as its match target.  For example, if Loaded is 4 with current
+			/// being 'A' and pNext containing 'B', 'C', and 'D', then IsNextEqual("BCD") would return true.
+			/// Need() must be called prior to IsNextEqual() with length equal or greater to the match string
+			/// or an exception will be thrown.
+			/// </summary>
+			bool IsNextEqual(const string& match);
+
+			int GetMaxLoading() const { return MaxLoading; }
+
+		public:
+			StreamParser();
+			virtual ~StreamParser();
+		};
+
+		class XmlParser : public StreamParser<64>
 		{
 			shared_ptr<XmlElement> GetCurrentElement();
 			shared_ptr<XmlNode> GetCurrentNode();			
@@ -75,49 +139,7 @@ namespace wb
 			/// element [0], if the document has been started.  The latest child being parsed is 
 			/// element [N].
 			/// </summary>
-			vector<shared_ptr<XmlNode>> NodeStack;
-
-			string CurrentSource;
-			int CurrentLineNumber;
-
-			string GetSource();
-
-			io::Stream* pCurrentStream;			
-			
-			char Current;
-			char* pNext;
-			enum { MaxLoading = 64 /*bytes*/ };
-			int Loaded;
-
-			/// <summary>
-			/// Need() provides a character buffer with additional lookahead of up to 10 characters for the 
-			/// XmlParser class.  If Need(1) returns true, then Current is ensured valid.  If Need(2) returns 
-			/// true, then Current and pNext[0] are valid.  If Need(3) is called, Current, pNext[0] and [1]
-			/// are valid, and so forth.  In all cases, the stream is not advanced if the requested need is 
-			/// already available.  If insufficient characters are loaded from the stream, then the stream 
-			/// advances- but in the case where Current is valid, it is not shifted from Next or further.
-			/// </summary>
-			/// <param name="NeedChars">The minimum number of characters in the Current and pNext
-			/// buffer that are needed.  The character in Current counts as 1.</param>
-			/// <returns>True if the requested characters are available.  False if the stream cannot provide
-			/// the needed characters at this time.</returns>
-			bool Need(int NeedChars);
-
-			/// <summary>
-			/// Advance() moves the current (and lookahead) buffer forward one character.  The lookahead buffer
-			/// is not guaranteed in this case, and only Current can be assumed to be valid after an Advance()
-			/// call.  If characters in the pNext buffer are needed, call Need() after Advance().
-			/// </summary>
-			/// <returns>True if the requested character is available in Current.  Flase if the stream cannot
-			/// provide the needed characters at this time.</returns>
-			bool Advance();
-
-			/// <summary>
-			/// IsNextEqual() is a helper that operates like the IsEqual() comparison function for strings,
-			/// but uses the "pNext" buffer as its match target.  For example, if Loaded is 4 with current
-			/// being 'A' and pNext containing 'B', 'C', and 'D', then IsNextEqual("BCD") would return true.
-			/// </summary>
-			bool IsNextEqual(const string& match);
+			vector<shared_ptr<XmlNode>> NodeStack;			
 
 			enum class State
 			{
@@ -160,7 +182,7 @@ namespace wb
 			/// <summary>Parses the string.  A complete XML document or fragment must be contained in the string or an exception
 			/// will be thrown.  An exception is thrown on error.</summary>
 			/// <returns>An XmlDocument parsed from the provided string.</returns>
-			static unique_ptr<XmlDocument> Parse(const string& str, const string& sSourceFilename = "");
+			static unique_ptr<XmlDocument> ParseString(const string& str, const string& sSourceFilename = "");
 
 			/// <summary>Parses the file, which must contain an XML document or fragment.  An exception is thrown on error.
 			/// A complete XML document or fragment must be contained in the file or an exception will be thrown.</summary>

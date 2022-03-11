@@ -35,8 +35,7 @@ namespace wb
 		class FileInfo
 		{
 			friend class DirectoryInfo;
-		protected:
-			FileInfo() { }
+		protected:			
 
 			/// <summary>Stores the full path to the file or directory.  In the case of a directory,
 			/// FullName should not be stored with the trailing directory separator.</summary>
@@ -45,7 +44,11 @@ namespace wb
 			DateTime LastWriteTime;
 			UInt64 Length;
 		public:			
-			FileInfo(const string& Path);
+			FileInfo() : Length(0) { }
+			FileInfo(const string& Path);			
+
+			bool IsEmpty() const { return FullName.empty(); }
+			bool operator!() const { return FullName.empty(); }
 
 			/// <summary>
 			/// Retrieves the full path of the directory or file.  For example, "C:\Path\Examples.xml".
@@ -254,11 +257,14 @@ namespace wb
 			{
 				if (FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 				{
-					DirectoryInfo fi;
-					fi.FullName = Path::StripTrailingSeparator(to_string(osstring(FindData.cFileName)));
-					fi.CreationTime = DateTime(FindData.ftCreationTime);
-					fi.LastWriteTime = DateTime(FindData.ftLastWriteTime);
-					ret.push_back(fi);
+					if (!IsEqual(FindData.cFileName, L".") && !IsEqual(FindData.cFileName, L".."))
+					{
+						DirectoryInfo fi;
+						fi.FullName = Path::Join(FullName, Path::StripTrailingSeparator(to_string(osstring(FindData.cFileName))));
+						fi.CreationTime = DateTime(FindData.ftCreationTime);
+						fi.LastWriteTime = DateTime(FindData.ftLastWriteTime);
+						ret.push_back(fi);
+					}
 				}
 			
 				if (!FindNextFile(hSearch, &FindData))

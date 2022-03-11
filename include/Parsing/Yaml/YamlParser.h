@@ -1,0 +1,1249 @@
+#if 0
+
+/////////
+//	YamlParser.h
+////
+
+#ifndef __WBYamlParser_h__
+#define __WBYamlParser_h__
+
+/** Dependencies **/
+
+#include <iostream>		// For debugging
+
+#include "../../IO/Streams.h"
+#include "../../IO/MemoryStream.h"
+#include "../Xml/XmlParser.h"
+#include "Yaml.h"
+
+/** Content **/
+
+namespace wb
+{
+	namespace yaml
+	{		
+		class YamlParser : public wb::xml::StreamParser<8>
+		{
+			typedef wb::xml::StreamParser<8> base;
+
+			enum ChompingStyle { Strip, Clip, Keep };			
+
+			/// <summary>
+			/// YamlKeyValuePair is used internally during parsing but should not be exposed in the resulting heirarchy.  All entries of YamlKeyValuePair should be transformed
+			/// into YamlMapping constructs before being returned from the parser.
+			/// </summary>
+			class YamlKeyValuePair : public YamlNode
+			{
+				typedef YamlNode base;
+			public:
+				YamlKeyValuePair(string FromSource, int FromIndentLevel, unique_ptr<YamlNode>&& pFromKey, unique_ptr<YamlNode>&& pToValue) 
+					: base(FromSource), IndentLevel(FromIndentLevel), pKey(std::move(pFromKey)), pValue(std::move(pToValue)) { }
+
+				YamlKeyValuePair(const YamlKeyValuePair&) = delete;
+				YamlKeyValuePair& operator=(const YamlKeyValuePair&) = delete;
+
+				int						IndentLevel;
+				unique_ptr<YamlNode>	pKey;
+				unique_ptr<YamlNode>	pValue;
+
+				unique_ptr<YamlNode>	DeepCopy() override {
+					auto pRet = make_unique<YamlKeyValuePair>(Source, IndentLevel, pKey->DeepCopy(), pValue->DeepCopy());
+					pRet->IndentLevel = IndentLevel;
+					pRet->base::operator=(*this);		// Shallow copy the base members
+					return dynamic_pointer_movecast<YamlNode>(std::move(pRet));
+				}
+
+				unique_ptr<YamlMapping>	MoveToMap() {					
+					auto pRet = make_unique<YamlMapping>(Source);
+					pRet->Map.insert(make_pair<unique_ptr<YamlNode>, unique_ptr<YamlNode>>(std::move(pKey), std::move(pValue)));
+					return pRet;
+					//return dynamic_pointer_movecast<YamlNode>(std::move(pRet));
+				}
+			};
+			
+			bool IsWhitespace(char ch) { return ch == ' ' || ch == '\t'; }
+			bool IsLinebreak(char ch) { return ch == '\r' || ch == '\n'; }		// Note, YAML 1.2: "Line breaks inside scalar content must be normalized by the YAML processor. Each such line break must be parsed into a single line feed character."						
+
+			// Calls Advance() to pass all whitespace at the current position and returns a count of the whitespace that was skipped over.			
+			int AdvanceWhitespace();
+
+			// Call AdvanceLine() while Current is a linebreak character to correctly step over the current and possibly a following linebreak character that should
+			// be normalized (combined) into the first linebreak character, as well as indention.  If two linebreaks of the same character (i.e. "\n\n") occur, then 
+			// the 2nd one is not advanced over, whereas mixed characters are (i.e. "\r\n" advance twice).  Returns false if Advance() returns false.  Indention
+			// is silently counted and the current line's indention is stored in the CurrentIndent member.
+			bool AdvanceLine();
+
+			unordered_map<string, string> Tags;
+			unordered_map<string, unique_ptr<YamlNode>>	Aliases;
+			
+			struct OpenMapping {
+				unique_ptr<YamlMapping>		pMap;
+				int							Indent;
+
+				OpenMapping(unique_ptr<YamlMapping>&& pOpenMap, int WithIndent)
+					: pMap(std::move(pOpenMap)), Indent(WithIndent)
+				{ }
+			};
+			stack<OpenMapping>	OpenMappings;
+
+			int CurrentIndent;				// Indent of the current line.  Calculated in AdvanceLine(), which is always called for a line break.
+			int CurrentBlockIndent;			// Indent of current block being parsed, or Int32_MaxValue if none.  Previous values can be captured on function stacks and then restored.			
+			int ParsingFlowSequences;		// Number of flow sequences currently being parsed.
+			int ParsingFlowMappings;		// Number of flow mappings currently being parsed.
+
+			static string Chomp(string input, ChompingStyle Style);
+
+			string InSourceString() {
+				if (CurrentSource.length() < 1) return ""; else return " in " + CurrentSource;
+			}
+			
+			void SetTag(unique_ptr<YamlNode>& OnNode, string Handle)
+			{
+				// This is only a partial implementation of Yaml tags- it does not detect errors in resolution.
+				auto it = Tags.find(Handle);
+				if (it == Tags.end()) {
+					OnNode->Tag = Handle;
+					return;
+				}
+				OnNode->Tag = it->second;
+				return;
+			}
+			
+			string ParseScalarContentLiteral();
+			string ParseScalarContent(bool& WasPlain, bool& WasLinebreak);
+			unique_ptr<YamlSequence> ParseBlockSequence();			
+			unique_ptr<YamlSequence> ParseFlowSequence();
+			unique_ptr<YamlMapping> ParseFlowMapping();
+			unique_ptr<YamlNode> ParseOneNodeLevel1(bool& WasLinebreak);			
+			unique_ptr<YamlNode> ParseOneNodeLevel2();
+			unique_ptr<YamlNode> ParseOneNode();
+			void ParseDirective();
+			void StartStream(wb::io::Stream& stream, const string& sSourceFilename);
+			void FinishStream();
+			unique_ptr<YamlNode> ParseTopLevel();						
+
+		public:
+
+			YamlParser();
+			~YamlParser();
+
+			/// <summary>Parses the stream, which must contain YAML document(s).  An exception is thrown on error.
+			/// The stream will only be advanced up to conclusion of the next YAML document.</summary>
+			/// <returns>A YamlNode, or nullptr if the document was empty.</returns>
+			static unique_ptr<YamlNode> Parse(wb::io::Stream& stream, const string& sSourceFilename = "");
+
+			static unique_ptr<YamlNode> ParseString(const string& str, const string& sSourceFilename = "");
+
+			/// <summary>Parses the string, which must contain a YAML fragment.  An exception is thrown on error.</summary>
+			/// <returns>The returned XmlDocument has been allocated with new and should be delete'd when done.</returns>
+			//unique_ptr<XmlDocument> ParseAsXml(const char *psz, const string& sSourceFilename = "");
+
+			/// <summary>Parses the stream, which must contain a YAML fragment.  An exception is thrown on error.</summary>
+			/// <returns>The returned XmlDocument has been allocated with new and should be delete'd when done.</returns>			
+			//unique_ptr<XmlDocument> ParseAsXml(wb::io::Stream& stream, const string& sSourceFilename = "");
+		};
+	
+		/** JsonParser Implementation **/
+		
+		inline YamlParser::YamlParser()
+			: 
+			CurrentIndent(0),
+			ParsingFlowSequences(0),
+			ParsingFlowMappings(0)
+		{
+		}
+
+		inline YamlParser::~YamlParser()
+		{
+		}						
+
+		inline int YamlParser::AdvanceWhitespace()
+		{
+			if (!Need(1)) return 0;
+			int count = 0;
+			while (IsWhitespace(Current)) {
+				count++;
+				if (!Advance()) return count;
+			}
+			return count;
+		}		
+
+		/*static*/ inline string YamlParser::Chomp(string input, ChompingStyle Style)
+		{
+			// Line breaks in 'input' are assumed to have already been normalized.  That is, only \n will appear, no \r.
+			if (Style == Keep) return input;
+
+			int last_content = (int)input.length() - 1;
+			for (int ii = (int)input.length() - 1; ii >= 0; ii--)
+			{
+				if (input[ii] == '\n') continue;
+				last_content = ii;
+				break;
+			}
+			if (last_content <= 0) return input;
+
+			switch (Style)
+			{
+			case Strip: return input.substr(0, last_content);
+			case Clip: 
+				if (last_content < input.length() - 1) return input.substr(0, last_content) + "\n";
+				else return input;			
+			default: throw NotSupportedException("Unrecognized chomping style in YAML parsing.");
+			}
+		}
+
+		inline bool YamlParser::AdvanceLine()
+		{
+			CurrentIndent = 0;
+
+			// First advance over one line break (which might be 2 characters if normalization is needed).
+
+			if (Current == '\n')
+			{
+				if (!Advance()) return false;
+				if (Current == '\r') {
+					if (!Advance()) return false;
+				}				
+			}
+			else if (Current == '\r')
+			{
+				if (!Advance()) return false;
+				if (Current == '\n') {
+					if (!Advance()) return false;
+				}				
+			}
+			else throw Exception("Expected a linebreak character to be the current character at AdvanceLine() call.");
+
+			// Next, count the current indent.
+			// Note that there may be no indent if the line break was followed by another line break immediately.
+
+			while (Current == ' ')
+			{
+				CurrentIndent++;
+				if (!Advance()) return false;
+			}
+			return true;
+		}
+
+		inline string YamlParser::ParseScalarContentLiteral()
+		{
+			bool Fold = (Current == '>');
+			if (!Fold && Current != '|') throw FormatException("Expected | or > to start literal block in YAML.");
+			if (!Advance()) return "";
+			
+			ChompingStyle ChompStyle = Clip;			// Default chomping style
+
+			string strExplicitIndentation = "";
+			while (!IsLinebreak(Current))
+			{
+				if (Current == '+') ChompStyle = Keep;
+				if (Current == '-') ChompStyle = Strip;
+				if (Current >= '0' && Current <= '9') strExplicitIndentation += Current;
+				if (Current == '#')
+				{
+					// Comment on the same line as the > or | character is valid and we ignore the rest of this line- including searching for +, -, and digits.
+					if (!Advance()) return "";
+					while (!IsLinebreak(Current)) { if (!Advance()) return ""; }
+					break;
+				}
+				if (!Advance()) return "";
+			}
+			int ExplicitIndentation = -1;
+			if (strExplicitIndentation.length() > 0) ExplicitIndentation = Int32_Parse(strExplicitIndentation, wb::NumberStyles::Integer);
+			if (!AdvanceLine()) return "";
+			
+			// YAML 1.2.2 spec: "If no indentation indicator is given, then the content indentation level is equal to the number of leading spaces on the 
+			// first non-empty line of the contents. If there is no non-empty line then the content indentation level is equal to the number of spaces on the longest line."
+			
+			/** Parse until we find the first non-empty text, detect indentation **/
+
+			int Indentation = ExplicitIndentation;
+			string ret;			
+
+			// CurrentIndent is set by AdvanceLine().
+
+			while (IsLinebreak(Current))
+			{
+				if (CurrentIndent > Indentation && ExplicitIndentation < 0) Indentation = CurrentIndent;
+				// This is an empty line.
+				if (Fold) ret += ' '; else ret += '\n';
+				if (!AdvanceLine()) return Chomp(ret, ChompStyle);
+			}
+
+			/** Parse non-empty line(s) **/
+				
+			// Current line contains text or content.
+				
+			// There may not have been any empty lines, in which case we may need to
+			// set the indentation now with this line.
+			if (Indentation < 0) Indentation = CurrentIndent;
+
+			// Is tihs line part of the literal block?
+			if (CurrentIndent < Indentation) return Chomp(ret, ChompStyle);		// No, we've broken out of the literal block.
+
+			// Yes, it is part of the literal block.
+			// If it is further indented relative to the detected or explicit indentation, then it contains whitespace that must be
+			// preserved.
+			bool MoreIndented = (CurrentIndent > Indentation);
+			for (int Additional = 0; Additional < (CurrentIndent - Indentation); Additional++) ret += ' ';
+
+			ret += Current;
+			while (!IsLinebreak(Current)) { ret += Current; if (!Advance()) return Chomp(ret, ChompStyle); }
+			if (!AdvanceLine()) return Chomp(ret, ChompStyle);			
+
+			/** Parse additional lines until indentation breaks us out or until end-of-stream **/
+
+			for (;;)
+			{								
+				if (IsLinebreak(Current))
+				{
+					// An empty line after the initial content.
+					ret += '\n';			// Fold does not apply to an empty line.
+					if (!AdvanceLine()) return Chomp(ret, ChompStyle);
+				}
+				else
+				{
+					if (CurrentIndent < Indentation) return Chomp(ret, ChompStyle);
+					MoreIndented = (CurrentIndent > Indentation);
+					for (int Additional = 0; Additional < (CurrentIndent - Indentation); Additional++) ret += ' ';
+
+					while (!IsLinebreak(Current)) { ret += Current; if (!Advance()) return Chomp(ret, ChompStyle); }
+					if (Fold && !MoreIndented) ret += ' '; else ret += '\n';			// Convert line breaks into whitespace.
+					if (!AdvanceLine()) return Chomp(ret, ChompStyle);
+				}
+			}
+		}
+
+		/// <summary>
+		/// ParseScalarContent() parses text until an indicator or other syntax is encountered.  Empty nodes are possible in
+		/// Yaml, so ParseScalarContent() may return an empty string.  ParseScalarContent() is guaranteed to call Advance()
+		/// at least once, as it could lead to an infinite loop if we continually parse empty nodes without advancing.  There
+		/// are rules in YAML about lookahead to a colon indicator being constrained to 1024 characters and further that the
+		/// colon must be found on the same line, and so the WasLinebreak boolean is returned to indicate if a linebreak split
+		/// the start of the scalar content from the current position.
+		/// </summary>
+		inline string YamlParser::ParseScalarContent(bool& WasPlain, bool& WasLinebreak)
+		{
+			if (!Need(1)) throw Exception("ParseScalarContent() unable to locate scalar content as Need(1) is false, parsing at " + GetSource() + ".");
+
+			WasLinebreak = false;
+			WasPlain = true;
+			string ParsingQuoteStarted = "";
+			char ParsingQuote = 0;
+			string ret;
+			bool EmptyLine = true;			
+			AdvanceWhitespace();
+			for (;;)
+			{
+				if (!Need(1)) return ret;
+
+				if (Current == '\'' && (ret.empty() || ParsingQuote != 0))
+				{
+					EmptyLine = false;					
+					if (ParsingQuote == '\'') {
+						Advance();
+						ParsingQuote = 0; 
+						WasPlain = false;
+						return ret;
+					}
+					else {						
+						ParsingQuote = '\'';
+						ParsingQuoteStarted = GetSource();
+						if (!Advance()) throw FormatException("Single quote starting scalar without matching closing quote at " + GetSource() + ".");						
+					}
+					continue;
+				}
+				if (ParsingQuote == '\"' && Current == '\\')
+				{
+					if (!Need(2)) throw FormatException("In double quoted scalar, backslash detected as start of escape sequence but no following character found at " + GetSource() + " from quote started at " + ParsingQuoteStarted + ".");
+					switch (pNext[0])
+					{
+					case '0': ret += '\0'; break;
+					case 'a': ret += '\a'; break;
+					case 'b': ret += '\b'; break;
+					case 't': ret += '\t'; break;
+					case 'n': ret += '\n'; break;
+					case 'v': ret += '\v'; break;
+					case 'f': ret += '\f'; break;
+					case 'r': ret += '\r'; break;
+					case 'x': throw NotImplementedException("Escaped unicode sequences are not implemented in this YAML parser at " + GetSource() + ".");
+					case '\"': ret += '\"'; break;
+					case '/': ret += '/'; break;
+					case '\\': ret += '\\'; break;
+					default: 
+						throw NotImplementedException("Escaped \\" + string(1, pNext[0]) + " sequence is not implemented in this YAML parser at " + GetSource() + ".");
+					}
+					if (!Advance(2)) throw FormatException("Double quote scalar started at " + ParsingQuoteStarted + " without matching closing quote.");
+					continue;
+				}
+				if (Current == '\"' && (ret.empty() || ParsingQuote != 0))
+				{
+					EmptyLine = false;					
+					if (ParsingQuote == '\"') {
+						Advance();
+						ParsingQuote = 0; 
+						WasPlain = false;
+						return ret;
+					}
+					else {
+						ParsingQuote = '\"';
+						ParsingQuoteStarted = GetSource();
+						if (!Advance()) throw FormatException("Double quote starting scalar without matching closing quote at " + GetSource() + ".");
+					}
+					continue;
+				}				
+				if (IsLinebreak(Current))
+				{
+					// A newline can terminate scalar content, but there are some rules.
+					// 
+					// Example #1:
+					//		key:
+					//			- value
+					// Example #2:
+					//		keyA: valueA
+					//		keyB: valueB					
+					// 
+					// In Example #1, after the colon we have a linebreak but no scalar content yet, so there is nothing to terminate.  We should proceed to
+					// parsing the following line instead.  In example #2, we must terminate the scalar after "valueA" and "valueB" because of the linebreaks.
+					// To fail to do so would not start the parsing of keyB as a key, but would mix it into valueA.  This is also part of closing out nodes.
+					//
+					// Exceptions to these rules can be intentionally introduced as part of a literal block.
+					if (EmptyLine) ret += "\n";
+					if (!AdvanceLine())
+					{
+						if (ParsingQuote != 0) throw FormatException("Unterminated YAML quotation (" + string(1, ParsingQuote) + ") at " + GetSource() + ".");
+						return ret;
+					}
+					//EmptyLine = true;
+					AdvanceWhitespace();
+					if (Trim(ret).length() > 0) { WasLinebreak = true; return ret; }
+					else continue;
+				}
+				if (ParsingQuote != 0)
+				{
+					ret += Current;
+					if (!Advance()) throw FormatException("Unterminated YAML quotation (" + string(1, ParsingQuote) + ") started at " + ParsingQuoteStarted + ".");
+					continue;
+				}
+				if (Current == ' ' || Current == '\t')
+				{
+					if (Need(2) && pNext[0] == '#')
+					{
+						if (!Advance(2)) return ret;
+						while (!IsLinebreak(Current)) { if (!Advance()) return ret; }
+						// Loop so as to hit the IsLinebreak() test.
+						continue;
+					}
+					if (EmptyLine)
+					{
+						if (!Advance()) return ret;
+						continue;
+					}
+					ret += Current;
+					if (!Advance()) return ret;
+					continue;
+				}				
+				if (Current == ':')
+				{
+					if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{
+						if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator (: ) found.");		// Should have been detected & handled at higher-level.
+						return ret;		// The ": " combination is an indicator, but what precedes it constitutes the scalar content.
+					}
+				}
+				if (EmptyLine && Current == '-')
+				{
+					if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{
+						if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator (- ) found.");		// Should have been detected & handled at higher-level.
+						return ret;		// Detected a block sequence (8.2.1) marker.
+					}
+				}
+				if (EmptyLine && Current == '.')
+				{
+					if (Need(3) && pNext[0] == '.' && pNext[1] == '.')
+					{
+						if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator (- ) found.");		// Should have been detected & handled at higher-level.
+						return ret;			// Detected an end-of-document marker.
+					}
+				}
+				if (Current == '|' || Current == '>')
+				{
+					// Check for c-b-block-header:
+					bool Qualified = true;
+					for (int ii = 2; ii < GetMaxLoading(); ii++)
+					{
+						if (!Need(ii))
+						{							
+							Qualified = false;
+							break;
+						}
+						if (pNext[ii - 2] == ' ' || pNext[ii - 2] == '\t' || IsLinebreak(pNext[ii - 2])) { Qualified = true; break; }
+						if (pNext[ii - 2] == '+' || pNext[ii - 2] == '-' || (pNext[ii - 2] >= '0' && pNext[ii - 2] <= '9')) continue;
+						Qualified = false;
+						break;
+					}
+					if (Qualified) 
+					{
+						if (!EmptyLine) throw FormatException("Illegal literal indicator following scalar content that has already initiated at " + GetSource() + ".");
+						WasPlain = false;
+						WasLinebreak = true;
+						return ParseScalarContentLiteral();
+					}
+				}
+				if (ParsingFlowMappings > 0 && (Current == ',' || Current == '}'))
+				{
+					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator found in flow mapping.");		// Should have been detected & handled at higher-level.
+					return ret;
+				}
+				if (ParsingFlowSequences > 0 && (Current == ',' || Current == ']'))
+				{
+					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator found in flow sequence.");		// Should have been detected & handled at higher-level.
+					return ret;
+				}
+				if (ret.empty() && (Current == '[' || Current == ']' || Current == '{' || Current == '}' || Current == ','))
+				{
+					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator found.");		// Should have been detected & handled at higher-level.
+					return ret;
+				}
+				ret += Current;
+				EmptyLine = false;
+				if (!Advance()) return ret;
+			}
+		}		
+
+		inline unique_ptr<YamlSequence> YamlParser::ParseBlockSequence()
+		{
+			if (!Need(2) || Current != '-' || (pNext[0] != ' ' && pNext[0] != '\t' && !IsLinebreak(pNext[0]))) throw Exception("Parsing block sequence without indicator at start: " + GetSource());
+			//if (!OpenMappings.empty() && OpenMappings.top().Indent 
+			//if (pQueuedNode != nullptr) throw Exception("Expected queue to be flushed before starting block sequence at " + GetSource());
+
+			int PreviousBlockIndent = CurrentBlockIndent;
+			CurrentBlockIndent = CurrentIndent;			
+
+			unique_ptr<YamlSequence> pSequence = make_unique<YamlSequence>(GetSource());
+			for (;;)
+			{
+				if (CurrentIndent < CurrentBlockIndent) break;
+
+				if (Current == ' ' || Current == '\t')
+				{
+					if (!Advance()) break;
+					continue;
+				}
+
+				if (Current == '#')
+				{
+					while (!IsLinebreak(Current)) { if (!Advance()) break; }
+					if (!AdvanceLine()) break;
+					continue;
+				}
+
+				if (IsLinebreak(Current)) { if (!AdvanceLine()) break; }
+
+				if (Current == '-')
+				{
+					if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{
+						// Block sequence entry identifier (- )
+						Advance();		
+						// Could probably allow the following to be parsed by ParseOneNode(), but using explicit handling for now:
+						bool bEOF;
+						if (IsLinebreak(Current)) bEOF = !AdvanceLine(); else bEOF = !Advance();
+						if (bEOF)
+						{
+							// Need to add an empty node at the end of the sequence because we found a - with no content following it.
+							auto pEmptyNode = unique_ptr<YamlNode>(new YamlScalar(GetSource()));
+							pSequence->Entries.push_back(std::move(pEmptyNode));
+							break;
+						}
+						auto pNext = ParseOneNode();
+						pSequence->Entries.push_back(std::move(pNext));
+						continue;
+					}
+				}
+
+				// We should not see mapping nodes here- they should have been merged into one node by ParseOneNode().
+				// A scalar without a leading dash would be an error.
+				// Any other content (i.e. flow) would be an error.
+				throw FormatException("Unexpected content at " + GetSource() + " following block sequence started at " + pSequence->Source + ".");
+			}
+			
+			CurrentBlockIndent = PreviousBlockIndent;
+			//if (pQueuedNode != nullptr) throw Exception("Unexpected queued mapping node at closure of block sequence at " + GetSource() + ".");
+			return pSequence;
+		}
+
+		inline unique_ptr<YamlSequence> YamlParser::ParseFlowSequence()
+		{
+			if (!Need(1) || Current != '[') throw Exception("Parsing flow sequence without indicator at start: " + GetSource());
+
+			// Indicate to ParseOneNode() that a comma or closing ] is acceptable and should cause a return, while allowing nesting.
+			ParsingFlowSequences++;
+
+			auto pSequence = make_unique<YamlSequence>(GetSource());
+			for (;;)
+			{
+				auto pNext = ParseOneNode();
+
+				if (!Need(1)) throw FormatException("Unterminated YAML flow sequence beginning at " + pSequence->Source + ".");
+
+				if (Current == ',')
+				{
+					if (!Advance()) throw FormatException("Unterminated YAML flow sequence beginning at " + pSequence->Source + ".");
+					pSequence->Entries.push_back(std::move(pNext));
+					continue;
+				}
+
+				if (Current == ']')
+				{
+					Advance();
+					if (pNext != nullptr) pSequence->Entries.push_back(std::move(pNext));
+					ParsingFlowSequences--;
+					return pSequence;
+				}
+			}
+		}
+
+		inline unique_ptr<YamlMapping> YamlParser::ParseFlowMapping()
+		{
+			if (!Need(1) || Current != '{') throw Exception("Parsing flow mapping without indicator at start: " + GetSource());
+
+			// Indicate to ParseOneNode() that a comma or closing } is acceptable and should cause a return, while allowing nesting.
+			ParsingFlowMappings++;
+
+			// We'll use an implicit sequence to wrap the individual mappings.
+			auto pMapping = make_unique<YamlMapping>(GetSource());
+			for (;;)
+			{
+				auto pNextNode = ParseOneNode();
+				if (pNextNode != nullptr && !is_type<YamlKeyValuePair>(pNextNode)) throw FormatException("Expected single key-value pair as entry at " + pNextNode->Source + " in flow mapping started at " + pMapping->Source + ".");
+				unique_ptr<YamlKeyValuePair> pNext = dynamic_pointer_movecast<YamlKeyValuePair>(std::move(pNextNode));
+
+				if (!Need(1)) throw FormatException("Unterminated YAML flow mapping beginning at " + pMapping->Source + ".");
+
+				if (Current == ',')
+				{
+					if (!Advance()) throw FormatException("Unterminated YAML flow mapping beginning at " + pMapping->Source + ".");
+					pMapping->Add(std::move(pNext->pKey), std::move(pNext->pValue));
+					continue;
+				}
+
+				if (Current == '}')
+				{
+					Advance();
+					if (pNext != nullptr) pMapping->Add(std::move(pNext->pKey), std::move(pNext->pValue));
+					ParsingFlowMappings--;
+					return pMapping;
+				}
+			}
+		}				
+
+		/// <summary>
+		/// ParseOneNodeLevel1() handles any parsing that can be done with no stack, queue, or memory 
+		/// of multiple nodes, prefixes, or postfixes.  It handles the things that can be handled with
+		/// no context.
+		/// </summary>
+		inline unique_ptr<YamlNode> YamlParser::ParseOneNodeLevel1(bool& WasLinebreak)
+		{
+			// 3.2.1.1 Nodes: Can have content of one of three kinds: scalar content, sequence, or mapping.						
+
+			WasLinebreak = false;
+
+			if (!Need(1)) return nullptr;				
+
+			if (Current == ' ' || Current == '\t' || Current == '#' || IsLinebreak(Current)) 
+				throw Exception("Unexpected character (" + string(1, Current) + ") at this level of processing at " + GetSource() + ".");
+
+			// Detect end of Yaml document marker...
+			if (Current == '.')
+			{
+				if (!Need(2)) throw FormatException("Dot (.) with no following data during YAML parsing at " + GetSource() + ".");
+				if (pNext[1] == '.' && pNext[2] == '.') return nullptr;
+			}
+
+			// Detect block sequence (8.2.1) indicator...
+			// Detect start of new Yaml document marker / end of directives, which in this context would imply the end of the current document...
+			if (Current == '-')
+			{
+				if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					throw Exception("Unexpected character (- ) at this level of processing at " + GetSource() + ".");
+				
+				if (!Need(2)) throw FormatException("Dash character with no following data during YAML parsing at " + GetSource() + ".");
+
+				if (pNext[0] == '-')
+				{
+					if (!Need(3)) throw FormatException("Dash pairs (--) with no following data during YAML parsing at " + GetSource() + ".");
+					if (pNext[1] == '-')
+					{
+						// Three dashes detected.  
+						Advance(); Advance(); Advance();
+						return nullptr;
+					}
+				}
+			}				
+			
+			if (Current == ':')
+			{
+				if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t'))
+				{
+					throw Exception("Unexpected character at this level of processing at " + GetSource() + ".");
+				}
+			}
+
+			if (Current == ',' || Current == ']' || Current == '}' || Current == '!' || Current == '&')
+				throw Exception("Unexpected character at this level of processing at " + GetSource() + ".");
+
+			if (Current == '%') throw FormatException("YAML directive character (%) found outside of a directive section at " + GetSource() + ".");			
+
+			if (Current == '*')
+			{					
+				if (!Advance()) throw FormatException("Alias character (*) with no token following in YAML parsing at " + GetSource() + ".");
+				string anchor;
+				while (Current != ' ' && Current != '\t' && Current != '[' && Current != ']' && Current != '{' && Current != '}' && Current != ',' && !IsLinebreak(Current))
+				{
+					anchor += Current;
+					if (!Advance()) break;
+				}
+				auto it = Aliases.find(anchor);
+				if (it == Aliases.end()) throw FormatException("Referenced node '" + anchor + "' was not found as a previous anchor at " + GetSource() + ".");
+				return it->second->DeepCopy();
+			}
+
+			if (Current == '[') {
+				//if (pQueuedNode != nullptr) return nullptr;		// Flush the queue before starting flow style.
+				return dynamic_pointer_movecast<YamlNode>(ParseFlowSequence());
+			}
+
+			if (Current == '{') {
+				//if (pQueuedNode != nullptr) return nullptr;		// Flush the queue before starting flow style.
+				return dynamic_pointer_movecast<YamlNode>(ParseFlowMapping());
+			}
+				
+			string StartSource = GetSource();
+			bool WasPlain = false;
+			string Text = ParseScalarContent(WasPlain, WasLinebreak);
+			if (WasPlain) Text = Trim(Text);
+			auto pScalar = unique_ptr<YamlNode>(new YamlScalar(StartSource, Text));
+			SetTag(pScalar, WasPlain ? "?" : "!");
+			return pScalar;
+		}
+
+		/*
+		* 
+		*	A:
+		*		alpha: 1
+		*		beta: 2
+		*	B:
+		*	C: ["one", "two", "three"]
+		*	D: ["one", "two", "three"] : "complicated"
+		*	E: 
+		*	    - first
+		*	    - second
+		*	F: {"one": 1, "two": 2, "three": 3} : ["fore"]
+		*	G: "finisher"
+		* 
+		*/
+
+		/// <summary>
+		/// ParseOneNodeLevel2() parses a single node (calling ParseOneNodeLevel1()) with direct prefix and 
+		/// postfix effects considered.  Prefixes include:
+		///		- tags
+		///		- explicit key marker
+		///		- sequence item marker
+		///		- anchors
+		/// 
+		/// The postfixes are:
+		///		- colon, indicating a key : value pair contributing or constituting a mapping.		
+		/// 
+		/// One final postfix effect the merging of multiple block mapping nodes that are at the same level of 
+		/// indentation.  This is not handled by ParseOneNodeLevel2().
+		/// </summary>
+		inline unique_ptr<YamlNode> YamlParser::ParseOneNodeLevel2()
+		{
+			string Tag = "!";
+			
+			bool ExplicitKey = false;
+
+			string anchor;
+
+			/** Parse for any prefixes **/
+
+			for (;;)
+			{
+				if (!Need(1)) return nullptr;
+
+				if (Current == ' ' || Current == '\t')
+				{
+					if (!Advance()) return nullptr;
+					continue;
+				}
+
+				if (Current == '#')
+				{
+					while (!IsLinebreak(Current)) { if (!Advance()) return nullptr; }
+					if (!AdvanceLine()) return nullptr;
+					continue;
+				}
+
+				if (IsLinebreak(Current)) {
+					if (!AdvanceLine()) return nullptr;
+					continue;
+				}
+
+				// Flush the queue anytime we have content at a lower indent.
+				if (ParsingFlowMappings == 0 && ParsingFlowSequences == 0 && !OpenMappings.empty() && OpenMappings.top().Indent > CurrentIndent) return nullptr;
+
+				if (Current == '&')
+				{
+					// Question: would it apply at this level or one level up?  For example, if you have a key:value is that one node?  
+					// A. No, I think, only if there were a
+					//		&anchor ? key : value 
+					// would it count as one node.  Otherwise, it must be taken that key:value breaks out as &anchor key : value with the anchor referencing the key
+					// only.
+
+					if (!Advance()) throw FormatException("Anchor character with no token following in YAML parsing at " + GetSource() + ".");
+					if (anchor.length() > 0) throw FormatException("Repeated anchors not permitted at " + GetSource() + ".");
+					while (Current != ' ' && Current != '\t' && Current != '[' && Current != ']' && Current != '{' && Current != '}' && Current != ',' && !IsLinebreak(Current))
+					{
+						anchor += Current;
+						if (!Advance()) throw FormatException("Anchor name specified without node content at " + GetSource() + ".");
+					}
+					continue;
+				}
+
+				if (Current == '!')
+				{
+					if (!Advance()) throw FormatException("Tag (!) character with no token following in YAML parsing at " + GetSource() + ".");
+					string handle;
+					while (Current != ' ' && Current != '\t' && !IsLinebreak(Current))
+					{
+						handle += Current;
+						if (!Advance()) throw FormatException("Tag (!) handle specified without node at " + GetSource() + ".");
+					}
+					Tag = handle;
+					continue;
+				}
+
+				// Detect explicit key indicator...
+				if (Current == '?')
+				{
+					// The question mark character makes it explicit that a mapping follows.  The colon is actually optional, and specifying no value can indicate
+					// an "unordered set" (mapping to null value).  The following is given as a valid YAML example of a set from YAML Example 2.25:
+					//
+					//	# Sets are represented as a
+					//	# Mapping where each key is
+					//	# associated with a null value
+					//	--- !!set
+					//	? Mark McGwire
+					//	? Sammy Sosa
+					//	? Ken Griffey
+					//
+					// Thus encountering a ? after a previous ? must start a new mapping.  Alternatively, rules for when a colon is not allowed can be applied,
+					// such as no colon allowed after a linebreak.
+										
+					if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{						
+						if (!Advance()) return unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(GetSource(), CurrentIndent, nullptr, nullptr));
+						ExplicitKey = true;
+
+						// Question mark works to an extent.  It marks an explicit key and works within a single line.  But the following gives trouble:
+						/**
+						*	? a
+						*   : b
+						* 
+						*	For example, see test case 35KP.
+						*	Also more complicated examples would probably similarly prove problematic, i.e.:
+						* 
+						*	? - a
+						*	  - b
+						*   : to_value
+						*/
+						throw NotSupportedException("Question mark in YAML parsing is not fully implemented at " + GetSource() + ".");
+						//continue;
+					}					
+				}
+
+				// Detect block sequence (8.2.1) indicator...				
+				if (Current == '-')
+				{
+					if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{
+						/**
+						*	Are we continuing a sequence or are we starting a new sequence?
+						*
+						*	- A:
+						*		- alpha
+						*		- beta
+						*	- B: done
+						*
+						*	We need to make sure that the initial value of CurrentBlockIndent is such that the - A line starts a block sequence.
+						*	The reduced indent on - B should be detected and cause us to return, closing the current node.
+						*
+						*   We'll return an empty node (nullptr) between beta and - B.  That's ambiguous with:
+						*
+						*	- A:
+						*		- alpha
+						*		- beta
+						*		-
+						*	- B: done
+						*
+						*	The nullptr should (eventually) propagate all the way up through ParseNode() to the calling ParseBlockSequence()
+						*	without advancing beyond the dash character.  Then ParseBlockSequence() can distinguish whether it is the top
+						*	case or the ambiguous bottom case.  The bottom case should not present a nullptr but instead an empty YamlScalar.
+						*/
+
+						if (CurrentIndent < CurrentBlockIndent) return nullptr;		// Note: we do not advance in this case, caller must reduce CurrentBlockIndent to proceed.
+						else {
+							return ParseBlockSequence();
+						}
+
+						/*
+						if (!Advance()) {
+							auto Seq = make_unique<YamlSequence>(GetSource());
+							Seq->Entries.push_back(nullptr);
+							return dynamic_pointer_movecast<YamlNode>(std::move(Seq));
+						}
+						*/
+					}
+				}
+
+				break;
+			}
+
+			/** Advance to the node itself **/
+
+			// Since the above clauses all lead to continue's and the loop proceeds through whitespace and linebreaks,
+			// we are guaranteed to be on a relevant character at this point.
+
+			bool WasLinebreak = false;
+			int IndentAtStart = CurrentIndent;
+			auto pLeft = ParseOneNodeLevel1(WasLinebreak);
+			SetTag(pLeft, Tag);
+
+			if (anchor.length() > 0) Aliases[anchor] = pLeft->DeepCopy();			// Override anchor if it already exists.
+
+			if (WasLinebreak)
+			{
+				// If there was a linebreak, then a colon is not allowed.  We have already applied all prefixes except possibly the explicit key marker.
+				if (ExplicitKey)
+				{
+					return unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(pLeft->Source, IndentAtStart, std::move(pLeft), nullptr));
+				}
+				else return pLeft;
+			}			
+
+			/** Parse for any postfixes **/
+
+			for (;;)
+			{
+				if (!Need(1)) break;
+
+				if (Current == ' ' || Current == '\t')
+				{
+					if (!Advance()) break;
+					continue;
+				}
+
+				if (Current == '#')
+				{					
+					while (!IsLinebreak(Current)) { if (!Advance()) break; }					
+					if (!AdvanceLine()) break;
+					continue;
+				}
+
+				// A linebreak here precludes the possibility of a colon.
+				if (IsLinebreak(Current)) {
+					if (!AdvanceLine()) break;
+					break;
+					
+				}
+
+				if (Current == ':')
+				{
+					if (!Advance())
+					{
+						return unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(GetSource(), IndentAtStart, std::move(pLeft), nullptr));
+					}
+					
+					// std::cout << "Parsing : at " << GetSource() << "\n";
+					auto ColonSource = GetSource();					// Since ParseOneNode() has side-effects, make sure we record location of the colon.
+					auto pRet = unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(ColonSource, IndentAtStart, std::move(pLeft), ParseOneNode()));
+					
+					return pRet;
+				}
+
+				break;
+			}
+
+			if (ExplicitKey)
+			{
+				return unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(pLeft->Source, IndentAtStart, std::move(pLeft), nullptr));
+			}
+			else return pLeft;
+		}
+
+		/// <summary>
+		/// ParseOneNode() handles the last postfix effect not address by ParseOneNodeLevel1() and ParseOneNodeLevel2(),
+		/// which is the merging of multiple block mapping nodes that are at the same level of indention.  ParseOneNode()
+		/// maintains a single-item buffer or queue that is retained between calls to accomplish this merging process.
+		/// </summary>
+		inline unique_ptr<YamlNode> YamlParser::ParseOneNode()
+		{
+			/**
+			*	A:
+			*		alpha:		1
+			*		beta:		2
+			*		charlie:	3
+			*	B:
+			* 
+			*   Two mappings should be formed here.  Written in JSON:
+			*		{ A : { alpha:1, beta:2, charlie:3 }, B : "" }
+			* 
+			*	Recursion is necessary if the indent increases.  This is accomplished inside ParseOneNodeLevel2(), however,
+			*   as the colon in the A will induce a recursive call to ParseOneNode().  Our job here is only to merge
+			*	alpha, beta, and charlie into one node, which will then become the value for A.  Upon return, the new
+			*   picture will look like:
+			* 
+			*	A: value
+			*	B:
+			* 
+			*	Thus, we must parse alpha, beta, and charlie.  Upon parsing B, we will notice the change in indent (equivalently,
+			*	any non-key-value-pair content here) and break as we have concluded a single node.
+			*/
+			
+			for (;;)
+			{
+				auto pSecond = ParseOneNodeLevel2();
+
+				// A nullptr value from ParseOneNodeLevel2() indicates that we need to close the current mapping or block, 
+				// or that we've reach EOF (which would also close the mapping).  To know if it's a mapping that needs closure,
+				// let's check the indent level.
+				if (pSecond == nullptr)
+				{
+					while (!OpenMappings.empty() && CurrentIndent < OpenMappings.top().Indent)
+					{
+						auto& mapping_info = OpenMappings.top();
+						auto pRet = std::move(mapping_info.pMap);
+						OpenMappings.pop();
+						return std::move(pRet);
+					}
+
+					// If we've gotten here, then either we received a nullptr because of a block and not a mapping, or
+					// we've reached EOF.  Blocks are handled higher up, as are EOFs.
+					return nullptr;
+				}
+
+				// Note: YamlMappings can come up from PraseOneNodeLevel2() as well, but they will be flow style
+				// and should not merge with OpenMappings.
+
+				if (pSecond == nullptr || !is_type<YamlKeyValuePair>(pSecond)) return pSecond;				
+
+				// Is there an open mapping to attach this to?  Do we need to make this the new
+				// open mapping?
+
+				auto pSecondKVP = dynamic_pointer_movecast<YamlKeyValuePair>(std::move(pSecond));
+
+				if (OpenMappings.empty() || pSecondKVP->IndentLevel > OpenMappings.top().Indent)
+				{
+					int AtIndent = pSecondKVP->IndentLevel;			// Grab this first as MoveToMap() has side effects.
+					OpenMappings.push(OpenMapping(pSecondKVP->MoveToMap(), AtIndent));
+					continue;
+				}
+
+				// At this point, the new KVP must be at the same level as the open one, and they can be
+				// merged.
+													
+				OpenMappings.top().pMap->Add(std::move(pSecondKVP->pKey), std::move(pSecondKVP->pValue));
+			}
+		}
+
+		inline void YamlParser::ParseDirective()
+		{
+			if (Current != '%') throw ArgumentException("Expected % as YAML current character.");
+
+			if (Need(5) && IsNextEqual("YAML"))
+			{
+				if (!Advance(5)) throw FormatException("Encountered YAML directive without value at " + GetSource() + ".");
+				if (Current != ' ' && Current != '\t') throw FormatException("Unrecognized directive at " + GetSource() + ".");
+				if (!Advance()) throw FormatException("Encountered YAML directive without value at " + GetSource() + ".");
+				AdvanceWhitespace();
+				string strVersion = "";
+				while ((Current >= '0' && Current <= '9') || Current == '.') {
+					strVersion += Current;
+					if (!Advance()) break;
+				}
+				if (strVersion.length() < 3 || strVersion.substr(0, 3) != "1.2") throw FormatException("Only YAML Version 1.2 is supported.");
+			}
+			else if (Need(4) && IsNextEqual("TAG"))
+			{
+				if (!Advance(4)) throw FormatException("Encountered YAML directive without value at " + GetSource() + ".");
+				if (Current != ' ' && Current != '\t') throw FormatException("Unrecognized directive at " + GetSource() + ".");
+				if (!Advance()) throw FormatException("Encountered YAML tag directive without handle at " + GetSource() + ".");
+				AdvanceWhitespace();
+				string handle = "";
+				while (Current != ' ' && Current != '\t' && !IsLinebreak(Current))
+				{
+					handle += Current;					
+					if (!Advance()) throw FormatException("Encountered YAML tag directive without value at " + GetSource() + ".");
+				}
+				AdvanceWhitespace();
+				string tag = "";
+				while (Current != ' ' && Current != '\t' && !IsLinebreak(Current))
+				{
+					tag += Current;
+					if (!Advance()) break;
+				}
+				if (Tags.count(handle) > 0) throw FormatException("YAML tag directive must only be given at most once per handle in the same document.");
+				Tags[handle] = tag;
+			}
+			else
+			{
+				// YAML spec indicates an unrecognized directive should be ignored with a warning.  We are not producing any warnings here, so we
+				// will just ignore it.
+				// throw FormatException("Encountered unrecognized YAML directive at " + GetSource() + ".");
+			}
+
+			while (!IsLinebreak(Current)) if (!Advance()) return;
+			AdvanceLine();
+		}
+
+		inline unique_ptr<YamlNode> YamlParser::ParseTopLevel()
+		{
+			Tags.clear();
+			Aliases.clear();
+			CurrentBlockIndent = 0;
+			ParsingFlowSequences = 0;
+			ParsingFlowMappings = 0;
+
+			/** Parse directives, and if we encounter anything then automatically switch to content **/
+			
+			for (;;)
+			{
+				if (!Need(1)) return nullptr;
+
+				if (Current == ' ' || Current == '\t')
+				{
+					if (!Advance()) return make_unique<YamlScalar>(GetSource(), "");
+					continue;
+				}
+
+				if (Current == '#')
+				{
+					while (!IsLinebreak(Current)) { if (!Advance()) return make_unique<YamlScalar>(GetSource(), ""); }
+					if (!AdvanceLine()) return make_unique<YamlScalar>(GetSource(), "");
+					continue;
+				}
+
+				if (IsLinebreak(Current)) {
+					if (!AdvanceLine()) return make_unique<YamlScalar>(GetSource(), "");
+					continue;
+				}
+
+				if (Current == '%')
+				{
+					ParseDirective();
+					continue;
+				}
+
+				if (Current == '-' && Need(3) && pNext[0] == '-' && pNext[1] == '-')
+				{										
+					// Three dashes.  Either separates the first document from directives, or signals the start of an additional document
+					// (and the end of the current document).
+					Advance(3);
+					break;
+				}
+
+				// Anything else, switch to content.
+				break;
+			}
+
+			/** Parse content **/
+
+			auto ret = ParseOneNode();
+
+			if (ret == nullptr)
+			{
+				if (OpenMappings.size() > 1) throw Exception("Unclosed mappings at end of parsing at " + GetSource() + ".");
+				auto& mapping_info = OpenMappings.top();
+				ret = dynamic_pointer_movecast<YamlNode>(std::move(mapping_info.pMap));
+				OpenMappings.pop();
+			}
+
+			if (Need(3) && Current == '-' && pNext[0] == '-' && pNext[1] == '-')
+			{
+				// Three dashes.  Either separates the first document from directives, or signals the start of an additional document
+				// (and the end of the current document).							
+				Advance(3);
+
+				// We've either already had a --- on this document or we have found nodes already.  Thus, this additional --- marker
+				// must end the current document.  It wasn't clear to me whether new directives were allowed after the --- marker
+				// if there are two documents, but since we can detect node content it seems safest to allow a new directive section
+				// for the new document.  Unclear to me if tags and aliases also reset.
+				return ret;
+			}
+			else if (Need(3) && Current == '.' && pNext[0] == '.' && pNext[1] == '.')
+			{
+				Advance(3);
+
+				// Example 6.18 demonstrates that new directives can follow the terminator sequence, so we need to start a new
+				// directive section and then return the content from the now-ended document.  Unclear to me if tags and aliases
+				// also reset.
+				return ret;
+			}
+			else if (!Need(1)) return ret;
+			else throw Exception("Unknown reason for termination of node parsing at " + GetSource() + ".");
+		}
+
+		inline void YamlParser::StartStream(wb::io::Stream& stream, const string& sSourceFilename)
+		{
+			CurrentSource = sSourceFilename;
+			CurrentLineNumber = 1;
+			CurrentIndent = 0;
+
+			pCurrentStream = &stream;
+			if (Need(3) && Current == 0xEF && pNext[0] == 0xBB && pNext[2] == 0xBF) {
+				// UTF-8 BOM.  TODO: Respond to detected encoding.
+				Advance(); Advance(); Advance();
+			}
+		}
+
+		inline void YamlParser::FinishStream()
+		{
+			CurrentSource = "";
+			CurrentLineNumber = 1;
+			pCurrentStream = nullptr;
+		}
+
+		inline /*static*/ std::unique_ptr<YamlNode> YamlParser::Parse(wb::io::Stream& stream, const string& sSourceFilename)
+		{
+			YamlParser parser;			
+			parser.StartStream(stream, sSourceFilename);
+			try
+			{
+				auto ret = parser.ParseTopLevel();
+				parser.FinishStream();
+				return ret;
+			}
+			catch (...)
+			{
+				parser.FinishStream();
+				throw;
+			}
+		}
+
+		inline /*static*/ unique_ptr<YamlNode> YamlParser::ParseString(const string& str, const string& sSourceFilename)
+		{
+			wb::io::MemoryStream ms;
+			wb::io::StringToStream(str, ms);
+			ms.Rewind();
+			return Parse(ms, sSourceFilename);
+		}
+	}
+}
+
+#endif	// __WBYamlParser_h__
+
+//	End of YamlParser.h
+
+#endif

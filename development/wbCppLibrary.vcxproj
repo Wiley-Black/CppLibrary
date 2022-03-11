@@ -63,10 +63,14 @@
     <ClInclude Include="..\include\Network\XMLSocket.h" />
     <ClInclude Include="..\include\Parsing\BaseTypeParsing.h" />
     <ClInclude Include="..\include\Parsing\JsonParserToXml.h" />
+    <ClInclude Include="..\include\Parsing\Json\Json.h" />
+    <ClInclude Include="..\include\Parsing\Json\JsonParser.h" />
     <ClInclude Include="..\include\Parsing\Xml\Implementation\XmlImpl.h" />
     <ClInclude Include="..\include\Parsing\Xml\Implementation\XmlParserImpl.h" />
     <ClInclude Include="..\include\Parsing\Xml\Xml.h" />
     <ClInclude Include="..\include\Parsing\Xml\XmlParser.h" />
+    <ClInclude Include="..\include\Parsing\Yaml\Yaml.h" />
+    <ClInclude Include="..\include\Parsing\Yaml\YamlParser.h" />
     <ClInclude Include="..\include\Platforms\Language.h" />
     <ClInclude Include="..\include\Platforms\Platforms.h" />
     <ClInclude Include="..\include\Processing\CRC.h" />

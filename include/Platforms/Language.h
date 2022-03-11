@@ -99,6 +99,96 @@
 inline double log2(double n) { return log(n) / log((double)2.0); }
 #endif
 
+/** unique_ptr helpers **/
+
+#include "../Foundation/STL/Memory.h"
+#include "../Foundation/STL/Collections/Stack.h"
+#include "../Foundation/STL/Collections/Queue.h"
+
+/// <summary>
+/// is_type() is a helper function that tests whether the given pointer can be dynamic_cast to another pointer type.  
+/// </summary>
+/// <seealso>dynamic_pointer_movecast()</seealso>
+/// <returns>True if the pointer can be cast to the specified type.  False if the pointer has a nullptr value or is 
+/// not castable to the templated Target type as a pointer.</returns>
+template<typename Target, typename Source> static inline bool is_type(const std::unique_ptr<Source>& ptr) {
+	return dynamic_cast<Target*>(ptr.get()) != nullptr;
+}
+
+/// <summary>
+/// dynamic_pointer_movecast() is a helper function that transfers from one unique_ptr to another unique_ptr while performing a dynamic typecast.  If the
+/// original pointer is null or if the dynamic cast yields a nullptr (because the original pointer cannot be cast to the Target* type), then
+/// the original object is deleted and a nullptr is returned.  In all cases, the original pointer is released.
+/// </summary>
+/// <example>
+/// unique_ptr&lt;Derived> CreatePolymorphicType()
+/// {
+///		return make_unique&lt;Derived>();
+/// }
+/// 
+/// ...
+///	unique_ptr&lt;Base> pBase = CreatePolymorphicType();
+/// if (is_type&lt;Derived>(pBase))
+/// {
+///		auto pDerived = dynamic_pointer_movecast(std::move(pBase));
+///		assert (pBase == nullptr);
+///		// Make use of Derived-specific features by pDerived pointer.
+/// }
+/// </example>
+/// <seealso>is_type</seealso>
+template<typename Target, typename Source> static inline std::unique_ptr<Target> dynamic_pointer_movecast(std::unique_ptr<Source>&& ptr) 
+{
+	Source* pTemp = ptr.release();
+	if (pTemp == nullptr) return nullptr;
+	
+	if (dynamic_cast<Target*>(pTemp) == nullptr)
+	{
+		delete pTemp;
+		return nullptr;
+	}
+	else return std::unique_ptr<Target>(dynamic_cast<Target*>(pTemp));
+}
+
+/// <summary>
+/// Convenience function for popping the top of a unique_ptr stack.  This combines two operations: top() followed by
+/// pop().  Since only one unique_ptr can hold the object, the top() call uses std::move() to extract the object's
+/// pointer into a temporary unique_ptr, then pop() removes the element that now holds only nullptr.  The temporary
+/// unique_ptr is then returned.
+/// </summary>
+/// <returns>Pointer to object that was previously on top of the stack.</returns>
+template<typename T> static inline std::unique_ptr<T> pop_top(std::stack<std::unique_ptr<T>>& from_stack)
+{
+	auto ret = std::move(from_stack.top());
+	from_stack.pop();
+	return ret;
+}
+
+/// <summary>
+/// Convenience function for popping the front of a unique_ptr queue.  This combines two operations: front() followed by
+/// pop().  
+/// </summary>
+/// <seealso>pop_top()</seealso>
+/// <returns>Pointer to object that was previously at the front of the queue.</returns>
+template<typename T> static inline std::unique_ptr<T> pop_front(std::queue<std::unique_ptr<T>>& from_queue)
+{
+	auto ret = std::move(from_queue.front());
+	from_queue.pop();
+	return ret;
+}
+
+/// <summary>
+/// Convenience function for popping the front of a unique_ptr vector.  This combines two operations: front() followed by
+/// erase() at begin().  
+/// </summary>
+/// <seealso>pop_top()</seealso>
+/// <returns>Pointer to object that was previously at the front of the queue.</returns>
+template<typename T> static inline std::unique_ptr<T> pop_front(std::vector<std::unique_ptr<T>>& from)
+{
+	auto ret = std::move(from.front());
+	from.erase(from.begin());
+	return ret;
+}
+
 #endif	// __WBLanguage_h__
 
 //  End of Language.h

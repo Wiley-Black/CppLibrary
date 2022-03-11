@@ -35,6 +35,10 @@
 #include "Parsing/BaseTypeParsing.h"
 #include "Parsing/Xml/Xml.h"
 #include "Parsing/Xml/XmlParser.h"
+#include "Parsing/Json/Json.h"
+#include "Parsing/Json/JsonParser.h"
+#include "Parsing/Yaml/Yaml.h"
+#include "Parsing/Yaml/YamlParser.h"
 
 #include "System/Diagnostics.h"
 #include "System/Environment.h"
