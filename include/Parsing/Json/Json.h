@@ -106,11 +106,11 @@ namespace wb
 					switch (Value[ii])
 					{
 					case '\\': ret += "\\\\"; continue;
-					case '\b': ret += "\\\b"; continue;
-					case '\n': ret += "\\\n"; continue;
-					case '\r': ret += "\\\r"; continue;
-					case '\f': ret += "\\\f"; continue;
-					case '\t': ret += "\\\t"; continue;
+					case '\b': ret += "\\b"; continue;
+					case '\n': ret += "\\n"; continue;
+					case '\r': ret += "\\r"; continue;
+					case '\f': ret += "\\f"; continue;
+					case '\t': ret += "\\t"; continue;
 					case '\"': ret += "\\\""; continue;
 					default: ret += Value[ii];
 					}

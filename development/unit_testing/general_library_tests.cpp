@@ -141,8 +141,6 @@ TEST(Library, XML)
 
 #pragma endregion
 
-#if 0
-
 #pragma region "Yaml (and Json) Parser Testing"
 
 bool CompareAttributes(shared_ptr<XmlAttribute>& a, shared_ptr<XmlAttribute>& b) {
@@ -212,11 +210,17 @@ string RemoveUnquotedJsonWhitespace(string from)
 	return ret;
 }
 
+#include <set>
+
 TEST(Library, YAML)
 {
 	using namespace wb::io;
 
 	std::cout << "UnitTesting: Library.YAML tests starting..." << "\n";
+
+	set<string>	KnownFails;
+	KnownFails.insert("4WA9");				// Explicit indentation indicators not supported.
+	KnownFails.insert("4QFQ");				// Explicit indentation indicators not supported.
 
 	/** Scan directory for test cases that we can use **/
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
@@ -234,10 +238,15 @@ TEST(Library, YAML)
 		if (!YamlFile.IsEmpty() && !JsonFile.IsEmpty())
 		{
 			string snippet_id = to_string(diCase.GetName());
+			if (KnownFails.count(snippet_id))
+			{
+				std::cout << "SKIP: " << snippet_id << " [known to not be supported]\n";
+				continue;
+			}
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
 
 bool hit = false;
-//if (!IsEqual(snippet_id, "2SXE")) continue;
+//if (!IsEqual(snippet_id, "229Q")) continue;
 hit = true;
 			
 			string YamlParsedToJson;			
@@ -247,6 +256,7 @@ hit = true;
 				auto pNode = wb::yaml::YamlParser::Parse(fsYaml, to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));
 				wb::yaml::JsonWriterOptions Options;
 				Options.UnquoteNumbers = true;
+				if (pNode == nullptr) pNode = unique_ptr<wb::yaml::YamlNode>(new wb::yaml::YamlScalar("empty document"));
 				YamlParsedToJson = pNode->ToJson(Options);
 			}
 			catch (std::exception& ex)
@@ -307,6 +317,5 @@ hit = true;
 		}
 	}	
 }
-#endif
 
 #pragma endregion
