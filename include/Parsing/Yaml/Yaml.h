@@ -136,7 +136,10 @@ namespace wb
 			unique_ptr<YamlNode>	DeepCopy() override {
 				auto pRet = make_unique<YamlSequence>(Source);
 				pRet->base::operator=(*this);		// Shallow copy the base members
-				for (auto& it : Entries) pRet->Entries.push_back(it->DeepCopy());
+				for (auto& it : Entries) {
+					if (!it) pRet->Entries.push_back(nullptr);
+					else pRet->Entries.push_back(it->DeepCopy());
+				}
 				return dynamic_pointer_movecast<YamlNode>(std::move(pRet));
 			}
 
@@ -192,7 +195,16 @@ namespace wb
 			unique_ptr<YamlNode>	DeepCopy() override {
 				auto pRet = make_unique<YamlMapping>(Source);
 				pRet->base::operator=(*this);		// Shallow copy the base members				
-				for (auto& it : Map) pRet->Map.insert(make_pair<unique_ptr<YamlNode>, unique_ptr<YamlNode>>(it.first->DeepCopy(), it.second->DeepCopy()));				
+				for (auto& it : Map) {
+					if (it.first == nullptr && it.second == nullptr)
+						pRet->Map.insert(make_pair<unique_ptr<YamlNode>, unique_ptr<YamlNode>>(nullptr, nullptr));
+					else if (it.first == nullptr)
+						pRet->Map.insert(make_pair<unique_ptr<YamlNode>, unique_ptr<YamlNode>>(nullptr, it.second->DeepCopy()));
+					else if (it.second == nullptr)
+						pRet->Map.insert(make_pair<unique_ptr<YamlNode>, unique_ptr<YamlNode>>(it.first->DeepCopy(), nullptr));
+					else
+						pRet->Map.insert(make_pair<unique_ptr<YamlNode>, unique_ptr<YamlNode>>(it.first->DeepCopy(), it.second->DeepCopy()));
+				}
 				return dynamic_pointer_movecast<YamlNode>(std::move(pRet));
 			}
 

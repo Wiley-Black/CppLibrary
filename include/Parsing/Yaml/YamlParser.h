@@ -1,6 +1,15 @@
 /////////
 //	YamlParser.h
 ////
+//	To clean this up and simplify, I would want to make the concept of a "block" much more consistent in the code.  Right now the parsing of
+//	block sequences, block mappings, and block scalars (as well as block scalar literals) is all pretty much handled separately.  I think
+//	a rewrite could use one routine for the parsing of the blocks and then reduce them to one node.  The rules for blocks are fairly
+//  consistent, just a matter of indent, although the scalars have a lot of special rules around linebreaks.
+// 
+//	This simplification could remove the need for the OpenMappings stack, and instead this stack of mappings could live on the function
+//  stack much as the sequences live as a variable within ParseBlockSequence().  Readahead is possible using indents in order to determine
+//	when the code should stop parsing one block and complete the node.
+////
 
 #ifndef __WBYamlParser_h__
 #define __WBYamlParser_h__
@@ -108,6 +117,8 @@ namespace wb
 			}
 			
 			string ParseScalarContentLiteral();
+			static string Unescape(string input, string Source);
+			static string ApplyFlowFolding(string input);
 			string ParseScalarContent(bool& WasPlain, bool& WasLinebreak);
 			unique_ptr<YamlSequence> ParseBlockSequence();
 			bool FindNextContent(bool FindLinebreaks = false);
@@ -143,8 +154,27 @@ namespace wb
 			//unique_ptr<XmlDocument> ParseAsXml(wb::io::Stream& stream, const string& sSourceFilename = "");
 		};
 	
-		/** JsonParser Implementation **/
+		/** YamlParser Implementation **/
 		
+		// Helper functions
+		inline void string_ReplaceAll(string& s, const string& search, const string& replace) 
+		{
+			for (size_t pos = 0; ; pos += replace.length()) {
+				// Locate the substring to replace
+				pos = s.find(search, pos);
+				if (pos == string::npos) break;
+				// Replace by erasing and inserting
+				s.erase(pos, search.length());
+				s.insert(pos, replace);
+			}
+		}
+
+		inline void string_RemoveAll(std::string& mainStr, const std::string& toErase)
+		{
+			size_t pos = std::string::npos;
+			while ((pos = mainStr.find(toErase)) != std::string::npos) mainStr.erase(pos, toErase.length());
+		}
+
 		inline YamlParser::YamlParser()
 			: 
 			CurrentIndent(0),
@@ -312,60 +342,164 @@ namespace wb
 			// Yes, it is part of the literal block.
 			// If it is further indented relative to the detected or explicit indentation, then it contains whitespace that must be
 			// preserved.
-			bool FoldPending = false;
-			bool MoreIndented = (CurrentIndent > Indentation);			
-			#if 0
-			for (int Additional = 0; Additional < (CurrentIndent - Indentation); Additional++) ret += ' ';
-
-			while (!IsLinebreak(Current)) { ret += Current; if (!Advance()) return Chomp(ret, ChompStyle); }
-			if (!AdvanceLine()) return Chomp(ret, ChompStyle);			
-			bool FoldPending = false;
-			if (Fold && !MoreIndented) FoldPending = true; else ret += '\n';			// Convert line breaks into whitespace.
-			#endif
+			string FoldsPending = "";			// '-' for a pending fold or 'n' for an empty line.  Queued left-to-right, i.e. "-n-" came from "foo\n\nbar\n".
+			bool MoreIndented = (CurrentIndent > Indentation);
 
 			/** Parse additional lines until indentation breaks us out or until end-of-stream **/
 			
 			for (;;)
-			{								
+			{
+				MoreIndented = (CurrentIndent > Indentation);
+				if (MoreIndented)
+				{
+					// When we hit a more indented line, any \n's that might have been folded need to be retained instead.
+					ret += string(FoldsPending.length(), '\n');
+					FoldsPending.clear();
+				}
+				for (int Additional = 0; Additional < (CurrentIndent - Indentation); Additional++) ret += ' ';
+
 				if (IsLinebreak(Current))
 				{
-					FoldPending = false;			// Disregard pending fold b/c of empty line that followed.
-					// An empty line after the initial content.
-					ret += '\n';			// Fold does not apply to an empty line.
-					if (!AdvanceLine()) return Chomp(ret, ChompStyle);
+					FoldsPending += 'n';		// Record an empty line in the pending list.
+					if (!AdvanceLine()) break;
 				}
 				else
 				{
 					if (CurrentIndent < Indentation) {
-						if (FoldPending) ret += '\n';			// Since it was terminal, retain the original linebreak and don't fold it.
-						return Chomp(ret, ChompStyle);
+						// Since it was terminal, retain the original linebreak and don't fold it.
+						if (FoldsPending.length()) FoldsPending[FoldsPending.length() - 1] = 'n';						
+						break;
 					}
-					if (FoldPending) ret += ' ';
-					FoldPending = false;
-					MoreIndented = (CurrentIndent > Indentation);
-					for (int Additional = 0; Additional < (CurrentIndent - Indentation); Additional++) ret += ' ';
+
+					// We've hit content at the same indentation level.  Any pending folds can now be
+					// applied as planned.
+					string_ReplaceAll(FoldsPending, "-n", "n");			// See test suite '4Q9F'.
+					for (auto ii = 0; ii < FoldsPending.length(); ii++)
+					{
+						if (FoldsPending[ii] == '-') ret += ' ';
+						if (FoldsPending[ii] == 'n') ret += '\n';
+					}
+					FoldsPending.clear();
 
 					while (!IsLinebreak(Current)) { 
 						ret += Current; 
-						if (!Advance()) return Chomp(ret, ChompStyle); 
+						if (!Advance()) break;
 					}
 					if (Fold && !MoreIndented)
 					{
 						// Convert line breaks into whitespace, except if an empty line follows...
 						if (!AdvanceLine()) { 
-							ret += '\n';			// Example 8.12: The final line break and trailing empty lines if any, are subject to chomping and are never folded.
-							return Chomp(ret, ChompStyle); 
+							FoldsPending += 'n';			// Example 8.12: The final line break and trailing empty lines if any, are subject to chomping and are never folded.
+							break;
 						}
-						FoldPending = true;
+						FoldsPending += '-';
 					}
 					else
 					{
 						ret += '\n';
-						if (!AdvanceLine()) return Chomp(ret, ChompStyle);
+						if (!AdvanceLine()) break;
 					}
 				}
 			}
+
+			for (auto ii = 0; ii < FoldsPending.length(); ii++)
+			{
+				if (FoldsPending[ii] == '-') ret += ' ';
+				if (FoldsPending[ii] == 'n') ret += '\n';
+			}
+			return Chomp(ret, ChompStyle);
+		}		
+
+		/*static*/ inline string YamlParser::ApplyFlowFolding(string input)
+		{
+			// See Example 6.8: Flow Folding.  Inside quotes is a flow style and subject to folding.
+			// "Folding in flow styles provides more relaxed semantics. Flow styles typically depend on explicit indicators rather than indentation 
+			// to convey structure. Hence spaces preceding or following the text in a line are a presentation detail and must not be used to convey 
+			// content information. Once all such spaces have been discarded, all line breaks are folded without exception.
+
+			// The combined effect of the flow line folding rules is that each “paragraph” is interpreted as a line, empty lines are interpreted as 
+			// line feedsand text can be freely more - indented without affecting the content information."
+
+			// Precondition: when in quotes, ParseScalarContent() captures the linebreaks as a single \n character and does not apply folding until
+			// close of the quotations, at which time ApplyFlowFolding is called to discard spaces and fold.
+			
+			string ret;
+			bool FoldPending = false;			
+			size_t ii = 0;
+			bool FirstLine = true;
+			for (;;)
+			{
+				auto next_linefeed = input.find('\n', ii);
+				string next_line = input.substr(ii, next_linefeed - ii);
+
+				// next_line contains all text on the next line (or is an empty string for an empty line), but excludes the \n itself.
+				next_line = Trim(next_line);
+
+				if (next_linefeed == string::npos) {					
+					if (FoldPending) ret += ' ';
+					if (next_line.length() > 0) ret += next_line;
+					return ret;
+				}
+				
+				if (next_line.length() == 0) {
+					if (FirstLine || next_linefeed == string::npos) FoldPending = true;		// The first and last lines aren't empty- they contain the quotation characters.
+					else {
+						// Empty line
+						ret += '\n';
+						FoldPending = false;
+					}
+				}
+				else
+				{
+					if (FoldPending) ret += ' ';
+					ret += next_line;
+					FoldPending = true;
+				}
+				FirstLine = false;
+				
+				ii = next_linefeed + 1;
+			}
 		}
+
+		/*static*/ inline string YamlParser::Unescape(string input, string Source)
+		{
+			string ret;
+			for (auto ii = 0; ii < input.length(); ii++)
+			{
+				if (input[ii] == '\\')
+				{
+					ii++;
+					if (ii >= input.length())
+						throw FormatException("Escaped character (\\) cannot be final character in a double-quoted string at " + Source);
+					switch (input[ii])
+					{
+					case '0': ret += '\0'; break;
+					case 'a': ret += '\a'; break;
+					case 'b': ret += '\b'; break;
+					case 't': ret += '\t'; break;
+					case 'n': ret += '\n'; break;
+					case 'v': ret += '\v'; break;
+					case 'f': ret += '\f'; break;
+					case 'r': ret += '\r'; break;
+					case 'x': throw NotImplementedException("Escaped unicode sequences are not implemented in this YAML parser at " + Source + ".");
+						// The quotation character unescape is handled while parsing and should not be handled again here.					
+					case '/': ret += '/'; break;
+					case '\\': ret += '\\'; break;
+
+						// From test suite 565N, a backslash before the linebreak within a double-quoted scalar appears to have the effect of nullifying the linebreak
+						// from the string without inserting whitespace.  This is similar to the C/C++ language where a backslash as the final character on a line
+						// will continue the line onto the next, uninterrupted.
+						// UPDATED: this is handled before Unescape(), because it needs to be handled before ApplyFlowFolding().
+					// case '\n': break;
+
+					default:
+						throw NotImplementedException("Escaped \\" + string(1, input[ii]) + " sequence is not implemented in this YAML parser at " + Source + ".");
+					}
+				}
+				else ret += input[ii];
+			}
+			return ret;
+		}		
 
 		/// <summary>
 		/// ParseScalarContent() parses text until an indicator or other syntax is encountered.  Empty nodes are possible in
@@ -409,7 +543,7 @@ namespace wb
 						Advance();
 						ParsingQuote = 0; 
 						WasPlain = false;
-						return ret;
+						return ApplyFlowFolding(ret);
 					}
 					else {						
 						ParsingQuote = '\'';
@@ -421,43 +555,39 @@ namespace wb
 				if (ParsingQuote == '\"' && Current == '\\')
 				{
 					if (!Need(2)) throw FormatException("In double quoted scalar, backslash detected as start of escape sequence but no following character found at " + GetSource() + " from quote started at " + ParsingQuoteStarted + ".");
-					switch (pNext[0])
-					{
-					case '0': ret += '\0'; break;
-					case 'a': ret += '\a'; break;
-					case 'b': ret += '\b'; break;
-					case 't': ret += '\t'; break;
-					case 'n': ret += '\n'; break;
-					case 'v': ret += '\v'; break;
-					case 'f': ret += '\f'; break;
-					case 'r': ret += '\r'; break;
-					case 'x': throw NotImplementedException("Escaped unicode sequences are not implemented in this YAML parser at " + GetSource() + ".");
-					case '\"': ret += '\"'; break;
-					case '/': ret += '/'; break;
-					case '\\': ret += '\\'; break;					
-					default: 
-						if (IsLinebreak(pNext[0]))
-						{
-							// From test suite 565N, a backslash before the linebreak within a double-quoted scalar appears to have the effect of nullifying the linebreak
-							// from the string without inserting whitespace.  This is similar to the C/C++ language where a backslash as the final character on a line
-							// will continue the line onto the next, uninterrupted.
-							Advance();
-							if (!AdvanceLine()) throw FormatException("Double quote scalar started at " + ParsingQuoteStarted + " without matching closing quote.");
-							continue;
-						}
-						throw NotImplementedException("Escaped \\" + string(1, pNext[0]) + " sequence is not implemented in this YAML parser at " + GetSource() + ".");
+					// Only handle double-quote character here.  Unescape() will handle the rest later.
+					if (pNext[0] == '\"') {
+						ret += '\"';
+						if (!Advance(2)) throw FormatException("Double quote scalar started at " + ParsingQuoteStarted + " without matching closing quote.");
 					}
-					if (!Advance(2)) throw FormatException("Double quote scalar started at " + ParsingQuoteStarted + " without matching closing quote.");
+					else if (IsLinebreak(pNext[0])) {
+						// Handle separately because we need to normalize the linebreak with AdvanceLine(), but we want to retain the escaping to avoid later folding.
+						ret += '\\';
+						ret += '\n';
+						if (!Advance() || !AdvanceLine()) throw FormatException("Double quote scalar started at " + ParsingQuoteStarted + " without matching closing quote.");
+					}
+					else {
+						ret += '\\';
+						ret += pNext[0];
+						if (!Advance(2)) throw FormatException("Double quote scalar started at " + ParsingQuoteStarted + " without matching closing quote.");
+					}
 					continue;
 				}
 				if (Current == '\"' && (ret.empty() || ParsingQuote == '\"'))
 				{
-					EmptyLine = false;					
+					EmptyLine = false;
 					if (ParsingQuote == '\"') {
 						Advance();
 						ParsingQuote = 0; 
 						WasPlain = false;
-						return ret;
+
+						// From test suite 565N, a backslash before the linebreak within a double-quoted scalar appears to have the effect of nullifying the linebreak
+						// from the string without inserting whitespace.  This is similar to the C/C++ language where a backslash as the final character on a line
+						// will continue the line onto the next, uninterrupted.  Since the \n characters will get folded, we need to remove them as a first step.  Since
+						// the \\n characters would become \n's and then get folded, we need to unescape everything else as a last step.
+						string_RemoveAll(ret, "\\\n");
+						ret = ApplyFlowFolding(ret);
+						return Unescape(ret, ParsingQuoteStarted);
 					}
 					else {
 						ParsingQuote = '\"';
@@ -467,21 +597,15 @@ namespace wb
 					continue;
 				}				
 				if (IsLinebreak(Current))
-				{
-					// A newline can terminate scalar content, but there are some rules.
-					// 
-					// Example #1:
-					//		key:
-					//			- value
-					// Example #2:
-					//		keyA: valueA
-					//		keyB: valueB					
-					// 
-					// In Example #1, after the colon we have a linebreak but no scalar content yet, so there is nothing to terminate.  We should proceed to
-					// parsing the following line instead.  In example #2, we must terminate the scalar after "valueA" and "valueB" because of the linebreaks.
-					// To fail to do so would not start the parsing of keyB as a key, but would mix it into valueA.  This is also part of closing out nodes.
-					//
-					// Exceptions to these rules can be intentionally introduced as part of a literal block.
+				{										
+					if (ParsingQuote != 0)
+					{
+						// Whitespace and folding will be handled in ApplyFlowFolding() at conclusion of the quotes, so retain all whitespace and linebreaks here as \n entries.
+						ret += "\n";
+						if (!AdvanceLine()) throw FormatException("Unterminated YAML quotation (" + string(1, ParsingQuote) + ") at " + GetSource() + ".");
+						continue;
+					}
+					
 					/*
 					if (ParsingQuote != 0)
 					{
@@ -510,8 +634,8 @@ namespace wb
 						// If FindNextContent() stops on a linebreak having just had an AdvanceLine(), then it means we've found an empty line.						
 						continue;
 					}
-					if (CurrentIndent < IndentOfBlock) {
-						if (ParsingQuote != 0) throw FormatException("Unterminated YAML quotation (" + string(1, ParsingQuote) + ") at " + GetSource() + " due to block indent change.");
+					if (CurrentIndent < IndentOfBlock && ParsingQuote == 0) {
+						//if (ParsingQuote != 0) throw FormatException("Unterminated YAML quotation (" + string(1, ParsingQuote) + ") at " + GetSource() + " due to block indent change.");
 						return Trim(ret);
 					}
 					if (FirstLinebreak)
@@ -733,14 +857,23 @@ namespace wb
 			}
 
 			// Didn't find content on the same line, so check the next non-empty line.
-			
-			// Skipping whitespace should be unnecessary here, since we have had an AdvanceLine() call.
+						
 			for (;;)
 			{
 				if (!Need(1))
 				{
 					// Indicator was the last thing in the document.  Use empty.
 					return false;
+				}
+
+				// Skipping whitespace should be unnecessary here, since we have had an AdvanceLine() call.  The exception is
+				// tabs, which don't count for indentation but still count as whitespace to be skipped and separating tokens.
+				// And since it is possible for a space to follow a tab, we want to skip over both.
+				if (Current == ' ' || Current == '\t')
+				{
+					if (!Advance()) return false;
+					// Don't count indent at this point.
+					continue;
 				}
 
 				if (Current == '#')
@@ -858,9 +991,12 @@ namespace wb
 
 				if (Current == ',')
 				{
-					if (!Advance()) throw FormatException("Unterminated YAML flow sequence beginning at " + pSequence->Source + ".");
-					pSequence->Entries.push_back(std::move(pNext));
-					continue;
+					if (!Advance() || !FindNextContent()) throw FormatException("Unterminated YAML flow sequence beginning at " + pSequence->Source + ".");
+					if (Current != ']')			// Tolerance for extra comma: i.e. [one, two, ]
+					{
+						pSequence->Entries.push_back(std::move(pNext));
+						continue;
+					}
 				}
 
 				if (Current == ']')
@@ -992,6 +1128,7 @@ namespace wb
 				}
 				auto it = Aliases.find(anchor);
 				if (it == Aliases.end()) throw FormatException("Referenced node '" + anchor + "' was not found as a previous anchor at " + GetSource() + ".");
+				if (it->second == nullptr) return nullptr;
 				return it->second->DeepCopy();
 			}
 
@@ -1057,51 +1194,17 @@ namespace wb
 				if (!FindNextContent()) return nullptr;
 
 				// Flush the queue anytime we have content at a lower indent.
-				if (ParsingFlowMappings == 0 && ParsingFlowSequences == 0 && !OpenMappings.empty() && OpenMappings.top().Indent > CurrentIndent) return nullptr;
+				if (ParsingFlowMappings == 0 && ParsingFlowSequences == 0 && !OpenMappings.empty() && OpenMappings.top().Indent > CurrentIndent) return nullptr;				
 
 				if (ParsingFlowMappings > 0)
 				{
 					if (Current == ',' || Current == '}') return nullptr;
 				}
 
-				if (Current == '&')
+				if (ParsingFlowSequences > 0)
 				{
-					// Question: would it apply at this level or one level up?  For example, if you have a key:value is that one node?  
-					// A. No, I think, only if there were a
-					//		&anchor ? key : value 
-					// would it count as one node.  Otherwise, it must be taken that key:value breaks out as &anchor key : value with the anchor referencing the key
-					// only.
-
-					int IndentAtStart = CurrentIndent;
-					if (!Advance()) throw FormatException("Anchor character with no token following in YAML parsing at " + GetSource() + ".");
-					if (anchor.length() > 0) throw FormatException("Repeated anchors not permitted at " + GetSource() + ".");
-					while (Current != ' ' && Current != '\t' && Current != '[' && Current != ']' && Current != '{' && Current != '}' && Current != ',' && !IsLinebreak(Current))
-					{
-						anchor += Current;
-						if (!Advance()) throw FormatException("Anchor name specified without node content at " + GetSource() + ".");
-					}
-					while (Current == ' ' || Current == '\t')
-					{
-						if (!Advance()) throw FormatException("Anchor name specified without node content at " + GetSource() + ".");
-					}
-
-					// Remove the anchor as affecting the indent.  Although really the key to this is parsing the whitespace above, since we didn't increment CurrentIndet.
-					CurrentIndent = IndentAtStart;			
-					continue;
-				}
-
-				if (Current == '!')
-				{
-					if (!Advance()) throw FormatException("Tag (!) character with no token following in YAML parsing at " + GetSource() + ".");
-					string handle;
-					while (Current != ' ' && Current != '\t' && !IsLinebreak(Current))
-					{
-						handle += Current;
-						if (!Advance()) throw FormatException("Tag (!) handle specified without node at " + GetSource() + ".");
-					}
-					Tag = handle;
-					continue;
-				}
+					if (Current == ',' || Current == ']') return nullptr;
+				}				
 
 				// Detect block sequence (8.2.1) indicator...				
 				if (Current == '-')
@@ -1134,12 +1237,56 @@ namespace wb
 
 						// Because we are not advancing, we are not incrementing CurrentIndent to count the '-' character itself, however this does
 						// count against the indent.  To predict whether we need to continue or start a new block, we need to include the +1 here.
+						// 
+						// Also see Example 8.22 in 8.2.3. Block Nodes, where a special exception/adjustment to the rule regarding block node indent is described.
 						if (CurrentIndent + 1 < CurrentBlockIndent) return nullptr;		// Note: we do not advance in this case, caller must reduce CurrentBlockIndent to proceed.
 						else {
 							return ParseBlockSequence();
 						}
 					}
 				}
+				else if (!ParsingFlowMappings && !ParsingFlowSequences && CurrentIndent < CurrentBlockIndent) return nullptr;		// Note: we do not advance in this case, caller must reduce CurrentBlockIndent to proceed.
+
+				if (Current == '&')
+				{
+					// Question: would it apply at this level or one level up?  For example, if you have a key:value is that one node?  
+					// A. No, I think, only if there were a
+					//		&anchor ? key : value 
+					// would it count as one node.  Otherwise, it must be taken that key:value breaks out as &anchor key : value with the anchor referencing the key
+					// only.
+
+					int IndentAtStart = CurrentIndent;
+					if (!Advance()) throw FormatException("Anchor character with no token following in YAML parsing at " + GetSource() + ".");
+					if (anchor.length() > 0) throw FormatException("Repeated anchors not permitted at " + GetSource() + ".");
+					while (Current != ' ' && Current != '\t' && Current != '[' && Current != ']' && Current != '{' && Current != '}' && Current != ',' && !IsLinebreak(Current))
+					{
+						anchor += Current;
+						if (!Advance()) throw FormatException("Anchor name specified without node content at " + GetSource() + ".");
+					}
+					while (Current == ' ' || Current == '\t')
+					{
+						if (!Advance()) throw FormatException("Anchor name specified without node content at " + GetSource() + ".");
+					}
+
+					// Remove the anchor as affecting the indent.  Although really the key to this is parsing the whitespace above, since we didn't increment CurrentIndent.
+					CurrentIndent = IndentAtStart;			
+					// Default the alias to nullptr, in case we return a nullptr before we end up parsing a node.
+					Aliases[anchor] = nullptr;
+					continue;
+				}
+
+				if (Current == '!')
+				{
+					if (!Advance()) throw FormatException("Tag (!) character with no token following in YAML parsing at " + GetSource() + ".");
+					string handle;
+					while (Current != ' ' && Current != '\t' && !IsLinebreak(Current))
+					{
+						handle += Current;
+						if (!Advance()) throw FormatException("Tag (!) handle specified without node at " + GetSource() + ".");
+					}
+					Tag = handle;
+					continue;
+				}				
 
 				// Detect explicit key indicator...				
 				if (Current == '?')
@@ -1176,14 +1323,14 @@ namespace wb
 			auto pLeft = ParseOneNodeLevel1(WasLinebreak);
 			if (pLeft == nullptr)
 			{
-				if (anchor.length() > 0) throw FormatException("Anchor '" + anchor + "' specified without node at " + GetSource() + ".");
+				// In case an anchor has been specified, it defaults to nullptr and has already been set as such.
 				return nullptr;
 			}
 			SetTag(pLeft, Tag);
 
 			if (anchor.length() > 0) Aliases[anchor] = pLeft->DeepCopy();			// Override anchor if it already exists.
 
-			if (WasLinebreak)
+			if (WasLinebreak && !ParsingFlowMappings)
 			{
 				// If there was a linebreak, then a colon is not allowed.  We have already applied all prefixes except possibly the explicit key marker.
 				return pLeft;
@@ -1208,11 +1355,11 @@ namespace wb
 					continue;
 				}
 
-				// A linebreak here precludes the possibility of a colon.
+				// A linebreak here precludes the possibility of a colon, except in flow mappings as some random exception to the rule.  Yaml has so many exceptions...
 				if (IsLinebreak(Current)) {
 					if (!AdvanceLine()) break;
+					if (ParsingFlowMappings) continue;
 					break;
-					
 				}
 
 				if (Current == ':')
@@ -1222,10 +1369,27 @@ namespace wb
 						return unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(GetSource(), IndentAtStart, std::move(pLeft), nullptr));
 					}
 					
+					/** Simplified test case 6KGN:
+					* 
+					*	---
+					*	a: 
+					*	b: 
+					*	---
+					* 
+					*	This test case should parse as { "a" : null, "b" : null }, because these are presented as sibling nodes.  This can
+					*   only be recognized by indent.  So when we hit a colon, we need to latch the indentation temporarily.
+					*/
+
+					int PrevBlockIndent = CurrentBlockIndent;
+					// I'm not sure where this is in the spec (i.e. that the colon counts as an indent here), but it makes sense for value parsing and 6KGN above.
+					if (CurrentIndent + 1 > CurrentBlockIndent) CurrentBlockIndent = CurrentIndent + 1;		
+
 					// std::cout << "Parsing : at " << GetSource() << "\n";
 					auto ColonSource = GetSource();					// Since ParseOneNode() has side-effects, make sure we record location of the colon.
 					auto pRet = unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(ColonSource, IndentAtStart, std::move(pLeft), ParseOneNode()));
 					
+					CurrentBlockIndent = PrevBlockIndent;
+
 					return pRet;
 				}
 
@@ -1456,6 +1620,7 @@ namespace wb
 				return ret;
 			}
 			else if (!Need(1)) return ret;
+			else if (!FindNextContent()) return ret;		// If the only content left is whitespace, it's fine to call this terminated.
 			else throw Exception("Unknown reason for termination of node parsing at " + GetSource() + ".");
 		}
 
