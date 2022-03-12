@@ -222,6 +222,14 @@ TEST(Library, YAML)
 	KnownFails.insert("4WA9");				// Explicit indentation indicators not supported.
 	KnownFails.insert("4QFQ");				// Explicit indentation indicators not supported.
 	KnownFails.insert("6XDY");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	KnownFails.insert("2SXE");				// No anchor support.
+	KnownFails.insert("7BMT");				// No anchor support.
+	KnownFails.insert("26DV");				// No anchor support.
+	KnownFails.insert("3GZX");				// No anchor support.
+	KnownFails.insert("3R3P");				// No anchor support.
+	KnownFails.insert("6KGN");				// No anchor support.
+	KnownFails.insert("7BUB");				// No anchor support.
+	KnownFails.insert("8G76");				// JSON parser requires document, empty JSON document not supported.
 
 	/** Scan directory for test cases that we can use **/
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
@@ -247,7 +255,7 @@ TEST(Library, YAML)
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
 
 bool hit = false;
-//if (!IsEqual(snippet_id, "87E4")) continue;
+//if (!IsEqual(snippet_id, "8KB6")) continue;
 hit = true;
 			
 			string YamlParsedToJson;			

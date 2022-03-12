@@ -35,6 +35,32 @@ namespace wb
 
 			enum ChompingStyle { Strip, Clip, Keep };			
 
+			unordered_map<string, string> Tags;
+			unordered_map<string, unique_ptr<YamlNode>>	Aliases;
+
+			struct OpenMapping {
+				unique_ptr<YamlMapping>		pMap;
+				int							Indent;
+
+				OpenMapping(unique_ptr<YamlMapping>&& pOpenMap, int WithIndent)
+					: pMap(std::move(pOpenMap)), Indent(WithIndent)
+				{ }
+			};
+			stack<OpenMapping>	OpenMappings;
+
+			int CurrentIndent;				// Indent of the current line.  Calculated in AdvanceLine(), which is always called for a line break.
+			int CurrentBlockIndent;			// Indent of current block being parsed, or Int32_MaxValue if none.  Previous values can be captured on function stacks and then restored.						
+
+			enum class Styles
+			{
+				Block,
+				FlowSequence,
+				FlowMapping
+			};
+			Styles CurrentStyle;
+
+			/** Helper classes and routines **/
+
 			/// <summary>
 			/// YamlKeyValuePair is used internally during parsing but should not be exposed in the resulting heirarchy.  All entries of YamlKeyValuePair should be transformed
 			/// into YamlMapping constructs before being returned from the parser.
@@ -78,33 +104,7 @@ namespace wb
 			// be normalized (combined) into the first linebreak character, as well as indention.  If two linebreaks of the same character (i.e. "\n\n") occur, then 
 			// the 2nd one is not advanced over, whereas mixed characters are (i.e. "\r\n" advance twice).  Returns false if Advance() returns false.  Indention
 			// is silently counted and the current line's indention is stored in the CurrentIndent member.
-			bool AdvanceLine();
-
-			unordered_map<string, string> Tags;
-			unordered_map<string, unique_ptr<YamlNode>>	Aliases;
-			
-			struct OpenMapping {
-				unique_ptr<YamlMapping>		pMap;
-				int							Indent;
-
-				OpenMapping(unique_ptr<YamlMapping>&& pOpenMap, int WithIndent)
-					: pMap(std::move(pOpenMap)), Indent(WithIndent)
-				{ }
-			};
-			stack<OpenMapping>	OpenMappings;
-
-			int CurrentIndent;				// Indent of the current line.  Calculated in AdvanceLine(), which is always called for a line break.
-			int CurrentBlockIndent;			// Indent of current block being parsed, or Int32_MaxValue if none.  Previous values can be captured on function stacks and then restored.						
-
-			enum class Styles
-			{
-				Block,
-				FlowSequence,
-				FlowMapping
-			};
-			Styles CurrentStyle;
-
-			static string Chomp(string input, ChompingStyle Style);
+			bool AdvanceLine();			
 
 			string InSourceString() {
 				if (CurrentSource.length() < 1) return ""; else return " in " + CurrentSource;
@@ -122,22 +122,41 @@ namespace wb
 				return;
 			}
 			
-			string ParseScalarContentLiteral();
+			/// <summary>
+			/// FindNextContent() is used throughout the YamlParser.  It advances the current position until something
+			/// other than whitespace, linebreaks, and comments is found while tracking indent.  Termination of the
+			/// document is monitored including end-of-stream, triple dashes, and triple dots.
+			/// </summary>
+			/// <param name="FindLinebreaks">[Default false] If true, then linebreaks are considered content for 
+			/// this search.</param>
+			/// <returns>True if the current position was advanced to content.  False if the end of the document was
+			/// reached before finding additional content.</returns>
+			bool FindNextContent(bool FindLinebreaks = false);
+
+			/** Scalar parsing **/
+			static string Chomp(string input, ChompingStyle Style);
+			static string ChompFoldList(string FoldList, ChompingStyle Style);
+			string ParseScalarContentLiteral();			
 			static string Unescape(string input, string Source);
 			static string ApplyFlowFolding(string input);
-			string ParseScalarContent(bool& WasPlain, bool& WasLinebreak);
-			unique_ptr<YamlSequence> ParseBlockSequence();
-			bool FindNextContent(bool FindLinebreaks = false);
+			string ParseScalarContent(bool& WasPlain, bool& WasLinebreak);			
+
+			/** Construct parsing **/
+			unique_ptr<YamlSequence> ParseBlockSequence();			
 			unique_ptr<YamlNode> ParseExplicitKeyValue();
 			unique_ptr<YamlSequence> ParseFlowSequence();
 			unique_ptr<YamlMapping> ParseFlowMapping();
+
+			/** Node parsing **/
 			unique_ptr<YamlNode> ParseOneNodeLevel1(bool& WasLinebreak);			
 			unique_ptr<YamlNode> ParseOneNodeLevel2();
 			unique_ptr<YamlNode> ParseOneNode();
-			void ParseDirective();
+
+			/** Document-level parsing **/
+			void ParseDirective();			
 			void StartStream(wb::io::Stream& stream, const string& sSourceFilename);
+			unique_ptr<YamlNode> ParseTopLevel();
 			void FinishStream();
-			unique_ptr<YamlNode> ParseTopLevel();						
 
 		public:
 
@@ -150,14 +169,6 @@ namespace wb
 			static unique_ptr<YamlNode> Parse(wb::io::Stream& stream, const string& sSourceFilename = "");
 
 			static unique_ptr<YamlNode> ParseString(const string& str, const string& sSourceFilename = "");
-
-			/// <summary>Parses the string, which must contain a YAML fragment.  An exception is thrown on error.</summary>
-			/// <returns>The returned XmlDocument has been allocated with new and should be delete'd when done.</returns>
-			//unique_ptr<XmlDocument> ParseAsXml(const char *psz, const string& sSourceFilename = "");
-
-			/// <summary>Parses the stream, which must contain a YAML fragment.  An exception is thrown on error.</summary>
-			/// <returns>The returned XmlDocument has been allocated with new and should be delete'd when done.</returns>			
-			//unique_ptr<XmlDocument> ParseAsXml(wb::io::Stream& stream, const string& sSourceFilename = "");
 		};
 	
 		/** YamlParser Implementation **/
@@ -223,6 +234,23 @@ namespace wb
 			case Clip: 
 				if (last_content < input.length() - 1) return input.substr(0, last_content+1) + "\n";
 				else return input;			
+			default: throw NotSupportedException("Unrecognized chomping style in YAML parsing.");
+			}
+		}
+
+		/*static*/ inline string YamlParser::ChompFoldList(string FoldList, ChompingStyle Style)
+		{
+			// Line breaks in 'input' are assumed to have already been normalized.  That is, only \n will appear, no \r.
+			// The FoldList can contain '-' for fold candidates and 'n' for empty lines or the final linebreak.
+			// The FoldList contains only entries found at the end of content- those subject to chomping.
+			if (Style == Keep) return FoldList;						
+
+			switch (Style)
+			{
+			case Strip: return "";
+			case Clip:
+				if (FoldList.length() == 0) return "";
+				return "n";
 			default: throw NotSupportedException("Unrecognized chomping style in YAML parsing.");
 			}
 		}
@@ -311,18 +339,20 @@ namespace wb
 			// YAML 1.2.2 spec, section 8.1.1.1: "If no indentation indicator is given, then the content indentation level is equal to the number of leading spaces on the 
 			// first non-empty line of the contents. If there is no non-empty line then the content indentation level is equal to the number of spaces on the longest line."
 			
-			/** Parse until we find the first non-empty text, detect indentation **/
+			/** Parse until we find the first non-empty text, track longest indentation **/
+
+			// Note: from test case 7T8X, comments are to be excluded from the content.
+			// CurrentIndent is set by AdvanceLine(), which moves past ' ' but stops at tabs or '#'.
 
 			int Indentation = ExplicitIndentation;
-			string ret;			
+			string ret;						
 
-			// CurrentIndent is set by AdvanceLine().
-
+			int LongestEmptyIndent = 0;
 			while (IsLinebreak(Current))
 			{
-				if (CurrentIndent > Indentation && ExplicitIndentation < 0) Indentation = CurrentIndent;
+				//if (CurrentIndent > Indentation && ExplicitIndentation < 0) Indentation = CurrentIndent;
+				if (CurrentIndent > LongestEmptyIndent) LongestEmptyIndent = CurrentIndent;
 				// This is an empty line.
-				//if (Fold) ret += ' '; else ret += '\n';
 				ret += '\n';			// Fold does not apply to an empty line.
 				if (!AdvanceLine()) return Chomp(ret, ChompStyle);
 			}
@@ -335,7 +365,7 @@ namespace wb
 			// set the indentation now with this line.
 			if (Indentation < 0) Indentation = CurrentIndent;
 
-			// Is tihs line part of the literal block?
+			// Is this line part of the literal block?
 			if (CurrentIndent < Indentation) {
 				// We never had any content inside the literal block.  But there was at least one linebreak (from
 				// the line with the folding indicator if nothing else).  From Section 6.5: "In the folded block style, the 
@@ -400,19 +430,21 @@ namespace wb
 						FoldsPending += '-';
 					}
 					else
-					{
-						ret += '\n';
+					{						
+						FoldsPending += 'n';				// Although in this style a '\n' is appended, we use FoldsPending to manage chomping on the end.
 						if (!AdvanceLine()) break;
 					}
 				}
 			}
 
+			FoldsPending = ChompFoldList(FoldsPending, ChompStyle);
 			for (auto ii = 0; ii < FoldsPending.length(); ii++)
 			{
 				if (FoldsPending[ii] == '-') ret += ' ';
 				if (FoldsPending[ii] == 'n') ret += '\n';
 			}
-			return Chomp(ret, ChompStyle);
+			return ret;
+			//return Chomp(ret, ChompStyle);
 		}		
 
 		/*static*/ inline string YamlParser::ApplyFlowFolding(string input)
@@ -438,7 +470,10 @@ namespace wb
 				string next_line = input.substr(ii, next_linefeed - ii);
 
 				// next_line contains all text on the next line (or is an empty string for an empty line), but excludes the \n itself.
-				next_line = Trim(next_line);
+				// Note: the first and last line are never empty- they contain the quotation marks.  Therefore the trimming must be adjusted.
+				if (FirstLine) next_line = TrimEnd(next_line);
+				else if (next_linefeed == string::npos) next_line = TrimStart(next_line);
+				else next_line = Trim(next_line);
 
 				if (next_linefeed == string::npos) {					
 					if (FoldPending) ret += ' ';
@@ -690,8 +725,11 @@ namespace wb
 				}
 				if (Current == '-' && Need(3) && pNext[0] == '-' && pNext[1] == '-')
 				{
-					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": end indicator (---) found.");		// Should have been detected & handled at higher-level.
-					return ret;
+					if (!Need(4) || pNext[2] == ' ' || pNext[2] == '\t' || IsLinebreak(pNext[2]))
+					{
+						if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": end indicator (---) found.");		// Should have been detected & handled at higher-level.
+						return ret;
+					}
 				}
 				if (Current == '-' && (ret.empty() || ret[ret.length()-1] == ' ' || ret[ret.length()-1] == '\t' || ret[ret.length()-1] == '\n'))
 				{
@@ -850,7 +888,9 @@ namespace wb
 					break;
 				}
 
-				if (Current == '-' && Need(3) && pNext[0] == '-' && pNext[1] == '-') return false;
+				if (Current == '-' && Need(3) && pNext[0] == '-' && pNext[1] == '-') {
+					if (!Need(4) || pNext[2] == ' ' || pNext[2] == '\t' || IsLinebreak(pNext[2])) return false;
+				}
 				if (Current == '.' && Need(3) && pNext[0] == '.' && pNext[1] == '.') return false;
 
 				if (IsLinebreak(Current)) { 
@@ -1141,9 +1181,12 @@ namespace wb
 					if (!Need(3)) throw FormatException("Dash pairs (--) with no following data during YAML parsing at " + GetSource() + ".");
 					if (pNext[1] == '-')
 					{
-						// Three dashes detected.  
-						Advance(); Advance(); Advance();
-						return nullptr;
+						if (!Need(4) || pNext[2] == ' ' || pNext[2] == '\t' || IsLinebreak(pNext[2]))
+						{
+							// Three dashes detected and not followed by a non-whitespace character.
+							Advance(); Advance(); Advance();
+							return nullptr;
+						}
 					}
 				}
 			}
@@ -1168,7 +1211,7 @@ namespace wb
 			if (Current == '%') throw FormatException("YAML directive character (%) found outside of a directive section at " + GetSource() + ".");			
 
 			if (Current == '*')
-			{					
+			{
 				if (!Advance()) throw FormatException("Alias character (*) with no token following in YAML parsing at " + GetSource() + ".");
 				string anchor;
 				while (Current != ' ' && Current != '\t' && Current != '[' && Current != ']' && Current != '{' && Current != '}' && Current != ',' && !IsLinebreak(Current))
@@ -1303,15 +1346,27 @@ namespace wb
 
 				if (Current == '&')
 				{
-					// Question: would it apply at this level or one level up?  For example, if you have a key:value is that one node?  
-					// A. No, I think, only if there were a
-					//		&anchor ? key : value 
-					// would it count as one node.  Otherwise, it must be taken that key:value breaks out as &anchor key : value with the anchor referencing the key
-					// only.
-
+					/** Test case 7BMT:
+					* 
+					*	top1: &node1
+					*	  &k1 key1: one
+					* 
+					*	Test case 2SXE:
+					* 
+					*	&a: key: &a value
+					*	foo:
+					*	  *a:
+					* 
+					*	Supporting both of these test cases requires adding new recursion.  i.e. in 7BMT, &node1 seems to refer to
+					*	the full node key1:one, which requires recursing and letting &k1 refer to key1.  For now, just turning off
+					*	support for anchors since my semantics aren't fully accurate to the spec.
+					*/					
+					throw NotSupportedException("Anchors are not supported by this YAML parser at " + GetSource() + ".");
+					
+					#if 0
 					int IndentAtStart = CurrentIndent;
-					if (!Advance()) throw FormatException("Anchor character with no token following in YAML parsing at " + GetSource() + ".");
-					if (anchor.length() > 0) throw FormatException("Repeated anchors not permitted at " + GetSource() + ".");
+					if (!Advance()) throw FormatException("Anchor character with no token following in YAML parsing at " + GetSource() + ".");					
+					if (anchor.length() > 0) throw NotSupportedException("This YAML parser does not support repeated anchors (multi-level anchors) at " + GetSource() + ".");
 					while (Current != ' ' && Current != '\t' && Current != '[' && Current != ']' && Current != '{' && Current != '}' && Current != ',' && !IsLinebreak(Current))
 					{
 						anchor += Current;
@@ -1329,6 +1384,7 @@ namespace wb
 					// Default the alias to nullptr, in case we return a nullptr before we end up parsing a node.
 					Aliases[anchor] = nullptr;
 					continue;
+					#endif
 				}
 
 				if (Current == '!')
@@ -1419,7 +1475,7 @@ namespace wb
 					if (!AdvanceLine()) break;
 					if (CurrentStyle == Styles::FlowMapping) continue;
 					break;
-				}
+				}				
 
 				if (Current == ':')
 				{
@@ -1451,6 +1507,13 @@ namespace wb
 
 					return pRet;
 				}
+
+				/*
+				if (CurrentStyle == Styles::FlowMapping && Current == ',')
+				{					
+					return unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(GetSource(), IndentAtStart, std::move(pLeft), nullptr));
+				}
+				*/
 
 				break;
 			}
@@ -1635,10 +1698,13 @@ namespace wb
 
 				if (Current == '-' && Need(3) && pNext[0] == '-' && pNext[1] == '-')
 				{										
-					// Three dashes.  Either separates the first document from directives, or signals the start of an additional document
-					// (and the end of the current document).
-					Advance(3);
-					break;
+					if (!Need(4) || pNext[2] == ' ' || pNext[2] == '\t' || IsLinebreak(pNext[2]))
+					{
+						// Three dashes.  Either separates the first document from directives, or signals the start of an additional document
+						// (and the end of the current document).
+						Advance(3);
+						break;
+					}
 				}
 
 				// Anything else, switch to content.
@@ -1660,7 +1726,8 @@ namespace wb
 				}
 			}
 
-			if (Need(3) && Current == '-' && pNext[0] == '-' && pNext[1] == '-')
+			if (Need(3) && Current == '-' && pNext[0] == '-' && pNext[1] == '-'
+			 && (!Need(4) || pNext[2] == ' ' || pNext[2] == '\t' || IsLinebreak(pNext[2])))
 			{
 				// Three dashes.  Either separates the first document from directives, or signals the start of an additional document
 				// (and the end of the current document).							
