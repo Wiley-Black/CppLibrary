@@ -674,9 +674,19 @@ namespace wb
 						// If FindNextContent() stops on a linebreak having just had an AdvanceLine(), then it means we've found an empty line.						
 						continue;
 					}
-					if (CurrentIndent < IndentOfBlock && ParsingQuote == 0) {
-						//if (ParsingQuote != 0) throw FormatException("Unterminated YAML quotation (" + string(1, ParsingQuote) + ") at " + GetSource() + " due to block indent change.");
-						return Trim(ret);
+					switch (CurrentStyle)
+					{
+					case Styles::Block:
+						if (CurrentIndent < IndentOfBlock && ParsingQuote == 0) {
+							return Trim(ret);
+						}
+						break;
+					case Styles::FlowMapping:
+						if (!ParsingQuote && (Current == ',' || Current == '}')) return Trim(ret);
+						break;
+					case Styles::FlowSequence:
+						if (!ParsingQuote && (Current == ',' || Current == ']')) return Trim(ret);
+						break;
 					}
 					if (FirstLinebreak)
 					{
@@ -1201,12 +1211,12 @@ namespace wb
 			{
 				if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t'))
 				{
-					throw Exception("Unexpected character at this level of processing at " + GetSource() + ".");
+					throw Exception("Unexpected character (: ) at this level of processing at " + GetSource() + ".");
 				}
 			}
 
 			if (Current == ',' || Current == ']' || Current == '}' || Current == '!' || Current == '&')
-				throw Exception("Unexpected character at this level of processing at " + GetSource() + ".");
+				throw Exception("Unexpected character (" + string(1, Current) + ") at this level of processing at " + GetSource() + ".");
 
 			if (Current == '%') throw FormatException("YAML directive character (%) found outside of a directive section at " + GetSource() + ".");			
 
@@ -1506,14 +1516,7 @@ namespace wb
 					CurrentBlockIndent = PrevBlockIndent;
 
 					return pRet;
-				}
-
-				/*
-				if (CurrentStyle == Styles::FlowMapping && Current == ',')
-				{					
-					return unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(GetSource(), IndentAtStart, std::move(pLeft), nullptr));
-				}
-				*/
+				}				
 
 				break;
 			}
@@ -1555,6 +1558,11 @@ namespace wb
 			for (;;)
 			{
 				auto pSecond = ParseOneNodeLevel2();
+
+				if (CurrentStyle == Styles::FlowMapping && Current == ',' && pSecond != nullptr && is_type<YamlScalar>(pSecond))
+				{
+					pSecond = unique_ptr<YamlNode>(make_unique<YamlKeyValuePair>(GetSource(), 0, std::move(pSecond), nullptr));
+				}
 
 				// A nullptr value from ParseOneNodeLevel2() indicates that we need to close the current mapping or block, 
 				// or that we've reach EOF (which would also close the mapping).  To know if it's a mapping that needs closure,

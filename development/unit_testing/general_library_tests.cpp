@@ -230,6 +230,7 @@ TEST(Library, YAML)
 	KnownFails.insert("6KGN");				// No anchor support.
 	KnownFails.insert("7BUB");				// No anchor support.
 	KnownFails.insert("8G76");				// JSON parser requires document, empty JSON document not supported.
+	KnownFails.insert("8XYN");				// No anchor support.
 
 	/** Scan directory for test cases that we can use **/
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
@@ -255,7 +256,7 @@ TEST(Library, YAML)
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
 
 bool hit = false;
-//if (!IsEqual(snippet_id, "8KB6")) continue;
+//if (!IsEqual(snippet_id, "93JH")) continue;
 hit = true;
 			
 			string YamlParsedToJson;			
