@@ -94,9 +94,15 @@ namespace wb
 			stack<OpenMapping>	OpenMappings;
 
 			int CurrentIndent;				// Indent of the current line.  Calculated in AdvanceLine(), which is always called for a line break.
-			int CurrentBlockIndent;			// Indent of current block being parsed, or Int32_MaxValue if none.  Previous values can be captured on function stacks and then restored.			
-			int ParsingFlowSequences;		// Number of flow sequences currently being parsed.
-			int ParsingFlowMappings;		// Number of flow mappings currently being parsed.
+			int CurrentBlockIndent;			// Indent of current block being parsed, or Int32_MaxValue if none.  Previous values can be captured on function stacks and then restored.						
+
+			enum class Styles
+			{
+				Block,
+				FlowSequence,
+				FlowMapping
+			};
+			Styles CurrentStyle;
 
 			static string Chomp(string input, ChompingStyle Style);
 
@@ -178,8 +184,7 @@ namespace wb
 		inline YamlParser::YamlParser()
 			: 
 			CurrentIndent(0),
-			ParsingFlowSequences(0),
-			ParsingFlowMappings(0)
+			CurrentStyle(Styles::Block)
 		{
 		}
 
@@ -728,12 +733,12 @@ namespace wb
 						return ParseScalarContentLiteral();
 					}
 				}
-				if (ParsingFlowMappings > 0 && (Current == ',' || Current == '}'))
+				if (CurrentStyle == Styles::FlowMapping && (Current == ',' || Current == '}'))
 				{
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator found in flow mapping.");		// Should have been detected & handled at higher-level.
 					return ret;
 				}
-				if (ParsingFlowSequences > 0 && (Current == ',' || Current == ']'))
+				if (CurrentStyle == Styles::FlowSequence && (Current == ',' || Current == ']'))
 				{
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator found in flow sequence.");		// Should have been detected & handled at higher-level.
 					return ret;
@@ -756,7 +761,7 @@ namespace wb
 			int PreviousBlockIndent = CurrentBlockIndent;
 			Advance();
 			CurrentIndent++;				// Example 6.2: The - indicator counts as indentation.
-			CurrentBlockIndent = CurrentIndent;
+			CurrentBlockIndent = CurrentIndent;			
 
 			unique_ptr<YamlSequence> pSequence = make_unique<YamlSequence>(GetSource());
 			if (!FindNextContent())
@@ -970,7 +975,17 @@ namespace wb
 				return unique_ptr<YamlNode>(new YamlKeyValuePair(QuestionMarkSource, QuestionMarkIndent, std::move(pKey), std::move(pValue)));
 			}
 
-			throw FormatException("Expected ? or : at " + GetSource() + " or indent change following previous ? found at " + QuestionMarkSource);
+			/** Test case 7W2P illustrates how valid content can follow the explicit key:value pair:
+			* 
+			*	? a
+			*	? b
+			*	c:
+			* 
+			*	The "c" entry here is an implicit key, and so still part of the mapping.
+			*/
+
+			//throw FormatException("Expected ? or : at " + GetSource() + " or indent change following previous ? found at " + QuestionMarkSource);
+			return unique_ptr<YamlNode>(new YamlKeyValuePair(QuestionMarkSource, QuestionMarkIndent, std::move(pKey), nullptr));
 		}
 
 		inline unique_ptr<YamlSequence> YamlParser::ParseFlowSequence()
@@ -980,7 +995,16 @@ namespace wb
 			CurrentIndent++;
 
 			// Indicate to ParseOneNode() that a comma or closing ] is acceptable and should cause a return, while allowing nesting.
-			ParsingFlowSequences++;
+			Styles PreviousStyle = CurrentStyle;
+			CurrentStyle = Styles::FlowSequence;
+
+			// At the start of the flow sequence, all mappings become closed.  Mappings must also be "popped" at every comma and
+			// at the ] indicator.  Mappings must re-open upon the ] indicator.
+			stack<OpenMapping> PreviousOpenMappings;		// Note: the order of this holding stack is reversed from OpenMappings.
+			while (!OpenMappings.empty()) {
+				PreviousOpenMappings.push(std::move(OpenMappings.top()));
+				OpenMappings.pop();
+			}
 
 			auto pSequence = make_unique<YamlSequence>(GetSource());
 			for (;;)
@@ -995,6 +1019,7 @@ namespace wb
 					if (Current != ']')			// Tolerance for extra comma: i.e. [one, two, ]
 					{
 						pSequence->Entries.push_back(std::move(pNext));
+						if (!OpenMappings.empty()) throw Exception("Expected all open mappings to be closed at flow sequence comma detection at " + GetSource() + ".");
 						continue;
 					}
 				}
@@ -1003,7 +1028,15 @@ namespace wb
 				{
 					Advance();
 					if (pNext != nullptr) pSequence->Entries.push_back(std::move(pNext));
-					ParsingFlowSequences--;
+
+					// Restore mappings that were closed upon start of this flow sequence...
+					if (!OpenMappings.empty()) throw Exception("Expected all open mappings to be closed at flow sequence end detection at " + GetSource() + ".");
+					while (!PreviousOpenMappings.empty()) {
+						OpenMappings.push(std::move(PreviousOpenMappings.top()));
+						PreviousOpenMappings.pop();
+					}
+
+					CurrentStyle = PreviousStyle;
 					return pSequence;
 				}
 			}
@@ -1016,10 +1049,19 @@ namespace wb
 			CurrentIndent++;
 
 			// Indicate to ParseOneNode() that a comma or closing } is acceptable and should cause a return, while allowing nesting.
-			ParsingFlowMappings++;
+			Styles PreviousStyle = CurrentStyle;
+			CurrentStyle = Styles::FlowMapping;
 
 			// We'll use an implicit sequence to wrap the individual mappings.
 			//auto pMapping = make_unique<YamlMapping>(GetSource());
+
+			// At the start of the flow sequence, all mappings become closed.  Mappings must also be "popped" at every comma and
+			// at the } indicator.  Mappings must re-open upon the } indicator.
+			stack<OpenMapping> PreviousOpenMappings;		// Note: the order of this holding stack is reversed from OpenMappings.
+			while (!OpenMappings.empty()) {
+				PreviousOpenMappings.push(std::move(OpenMappings.top()));
+				OpenMappings.pop();
+			}
 
 			// ParseOneNode() will capture the flow mappings before returning into an OpenMappings, since the individual entries
 			// for the flow mapping will be key:value pairs (YamlKeyValuePairs) before reaching here.  To account for this, we
@@ -1037,18 +1079,26 @@ namespace wb
 
 				if (Current == ',')
 				{
-					if (!Advance()) throw FormatException("Unterminated YAML flow mapping beginning at " + ThisMap.Source + ".");
-					//pMapping->Add(std::move(pNext->pKey), std::move(pNext->pValue));
+					if (!Advance()) throw FormatException("Unterminated YAML flow mapping beginning at " + ThisMap.Source + ".");					
 					continue;
 				}
 
 				if (Current == '}')
 				{
-					Advance();
-					//if (pNext != nullptr) pMapping->Add(std::move(pNext->pKey), std::move(pNext->pValue));
-					ParsingFlowMappings--;
+					Advance();					
+					
 					auto pRet = std::move(OpenMappings.top().pMap);
 					OpenMappings.pop();
+
+					// Restore mappings that were closed upon start of this flow sequence...
+					if (!OpenMappings.empty()) throw Exception("Expected all open mappings to be closed at flow mapping end detection at " + GetSource() + ".");
+					while (!PreviousOpenMappings.empty()) {
+						OpenMappings.push(std::move(PreviousOpenMappings.top()));
+						PreviousOpenMappings.pop();
+					}
+
+					CurrentStyle = PreviousStyle;
+
 					return std::move(pRet);
 				}
 			}
@@ -1194,17 +1244,21 @@ namespace wb
 				if (!FindNextContent()) return nullptr;
 
 				// Flush the queue anytime we have content at a lower indent.
-				if (ParsingFlowMappings == 0 && ParsingFlowSequences == 0 && !OpenMappings.empty() && OpenMappings.top().Indent > CurrentIndent) return nullptr;				
+				if (CurrentStyle == Styles::Block && !OpenMappings.empty() && OpenMappings.top().Indent > CurrentIndent) return nullptr;				
 
-				if (ParsingFlowMappings > 0)
+				if (CurrentStyle == Styles::FlowMapping)
 				{
+					// This should have the dual effect of closing any mappings that opened during parsing of the entry within the flow style and passing
+					// them up toward ParseFlowMapping(), as well as allowing ParseFlowMapping() to do further processing.
 					if (Current == ',' || Current == '}') return nullptr;
 				}
 
-				if (ParsingFlowSequences > 0)
+				if (CurrentStyle == Styles::FlowSequence)
 				{
+					// This should have the dual effect of closing any mappings that opened during parsing of the entry within the flow style and passing
+					// them up toward ParseFlowSequence(), as well as allowing ParseFlowSequence() to do further processing.
 					if (Current == ',' || Current == ']') return nullptr;
-				}				
+				}
 
 				// Detect block sequence (8.2.1) indicator...				
 				if (Current == '-')
@@ -1245,7 +1299,7 @@ namespace wb
 						}
 					}
 				}
-				else if (!ParsingFlowMappings && !ParsingFlowSequences && CurrentIndent < CurrentBlockIndent) return nullptr;		// Note: we do not advance in this case, caller must reduce CurrentBlockIndent to proceed.
+				else if (CurrentStyle == Styles::Block && CurrentIndent < CurrentBlockIndent) return nullptr;		// Note: we do not advance in this case, caller must reduce CurrentBlockIndent to proceed.
 
 				if (Current == '&')
 				{
@@ -1335,7 +1389,7 @@ namespace wb
 
 			if (anchor.length() > 0) Aliases[anchor] = pLeft->DeepCopy();			// Override anchor if it already exists.
 
-			if (WasLinebreak && !ParsingFlowMappings)
+			if (WasLinebreak && CurrentStyle == Styles::Block)
 			{
 				// If there was a linebreak, then a colon is not allowed.  We have already applied all prefixes except possibly the explicit key marker.
 				return pLeft;
@@ -1363,7 +1417,7 @@ namespace wb
 				// A linebreak here precludes the possibility of a colon, except in flow mappings as some random exception to the rule.  Yaml has so many exceptions...
 				if (IsLinebreak(Current)) {
 					if (!AdvanceLine()) break;
-					if (ParsingFlowMappings) continue;
+					if (CurrentStyle == Styles::FlowMapping) continue;
 					break;
 				}
 
@@ -1444,12 +1498,16 @@ namespace wb
 				// let's check the indent level.
 				if (pSecond == nullptr)
 				{
-					while (!OpenMappings.empty() && CurrentIndent < OpenMappings.top().Indent)
+					if (!OpenMappings.empty())
 					{
-						auto& mapping_info = OpenMappings.top();
-						auto pRet = std::move(mapping_info.pMap);
-						OpenMappings.pop();
-						return std::move(pRet);
+						bool ShouldPop = CurrentIndent < OpenMappings.top().Indent;
+						if (CurrentStyle == Styles::FlowSequence) ShouldPop |= (Current == ',' || Current == ']');
+						while (ShouldPop)
+						{
+							auto pRet = std::move(OpenMappings.top().pMap);
+							OpenMappings.pop();
+							return std::move(pRet);
+						}
 					}
 
 					// If we've gotten here, then either we received a nullptr because of a block and not a mapping, or
@@ -1469,7 +1527,7 @@ namespace wb
 				// entries and not to individual entries within the flow style.  ParseFlowMapping() accounts for
 				// this by placing the flow mapping on top of the stack with 0 indent until completion.  We
 				// do, however, need to tweak the indent here.
-				if (ParsingFlowMappings > 0) pSecondKVP->IndentLevel = 0;
+				if (CurrentStyle == Styles::FlowMapping) pSecondKVP->IndentLevel = 0;
 
 				// Lastly, check if we need to open a new mapping or merge with the top open one.
 
@@ -1543,8 +1601,7 @@ namespace wb
 			Aliases.clear();
 			while (!OpenMappings.empty()) OpenMappings.pop();		// Clear OpenMappings.
 			CurrentBlockIndent = 0;
-			ParsingFlowSequences = 0;
-			ParsingFlowMappings = 0;
+			CurrentStyle = Styles::Block;
 
 			/** Parse directives, and if we encounter anything then automatically switch to content **/
 			
