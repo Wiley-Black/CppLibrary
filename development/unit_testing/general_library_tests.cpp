@@ -221,6 +221,7 @@ TEST(Library, YAML)
 	set<string>	KnownFails;
 	KnownFails.insert("4WA9");				// Explicit indentation indicators not supported.
 	KnownFails.insert("4QFQ");				// Explicit indentation indicators not supported.
+	KnownFails.insert("6XDY");				// JSON parser only reads a single document.  This isn't really valid JSON.
 
 	/** Scan directory for test cases that we can use **/
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
@@ -246,7 +247,7 @@ TEST(Library, YAML)
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
 
 bool hit = false;
-//if (!IsEqual(snippet_id, "4Q9F")) continue;
+//if (!IsEqual(snippet_id, "7W2P")) continue;
 hit = true;
 			
 			string YamlParsedToJson;			
@@ -271,17 +272,13 @@ hit = true;
 				// To get consistent results from the JSON parser vs YAML parser, run YAML->JSON->JSON.  That is, run the output of the
 				// Yaml "ToJson()" through the Json parser to get consistent Json format.				
 				pYamlParsedToJsonParsed = wb::json::JsonParser::ParseString(YamlParsedToJson.c_str(), "YAML->JSON of " + to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));
-				//SortAttributes(*(pJsonNode->GetDocumentElement()));
-				//YamlParsedToJsonToJson = pJsonNode->ToString();
 			}
 			catch (std::exception& ex)
 			{
 				std::cout << "\nFailure during JSON Re-Parsing (from YAML->JSON) of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n" << "\nYAML -> JSON:\n" << YamlParsedToJson << "\n";
 				continue;
 			}
-
-			//string JsonFromFile;
-			//string JsonParsed;
+			
 			unique_ptr<wb::json::JsonValue> pJsonParsed;
 			try
 			{
@@ -291,20 +288,13 @@ hit = true;
 				
 				io::FileStream fsJson(JsonFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);				
 				pJsonParsed = wb::json::JsonParser::Parse(fsJson, to_string(diCase.GetName()) + "/" + to_string(JsonFile.GetName()));				
-				//SortAttributes(*(pNode->GetDocumentElement()));
-				//JsonParsed = pNode->ToString();				
 			}
 			catch (std::exception& ex)
 			{
 				FAIL() << "\nFailure reading JSON test case target from YAML snippet '" << snippet_id << "':\n" << string(ex.what()) << "\n";
 			}
-
-			//if (!IsEqual(RemoveUnquotedJsonWhitespace(YamlParsedToJson), RemoveUnquotedJsonWhitespace(JsonFromFile))) {
-			//	std::cout << "\nMismatch of YAML to target JSON in test case '" << snippet_id << "':\nYAML:\n" << YamlParsedToJson << "\nJSON:\n" << JsonFromFile << "\n";
-			//}
-			//if (!IsEqual(RemoveUnquotedJsonWhitespace(YamlParsedToJsonToXmlToJson), RemoveUnquotedJsonWhitespace(JsonParsedToXmlToJson)))
-			//if (!IsEqual(RemoveUnquotedJsonWhitespace(YamlParsedToJsonToJson), RemoveUnquotedJsonWhitespace(JsonParsed)))
-			if (!json::IsEqual(pYamlParsedToJsonParsed, pJsonParsed))
+			
+			if (!json::IsEqual(pYamlParsedToJsonParsed, pJsonParsed, /*Strict=*/ false))
 			{
 				std::cout << "\nMismatch of YAML to target JSON in test case '" << snippet_id << "':"
 					<< "\nYAML -> JSON:\n" << pYamlParsedToJsonParsed->ToString() << "\n"

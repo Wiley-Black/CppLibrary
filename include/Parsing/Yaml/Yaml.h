@@ -90,12 +90,18 @@ namespace wb
 				if (!UnquoteNumbers) return "\"" + wb::json::JsonString::Escape(Content) + "\"";
 
 				// Check if the value is entirely numeric...
+				if (Content.length() == 0) return "\"\"";
+				if (!(Content[0] >= '0' && Content[0] <= '9') && Content[0] != '.'
+					&& Content[0] != '+' && Content[0] != '-')
+					return "\"" + wb::json::JsonString::Escape(Content) + "\"";
+				
 				for (auto ii = 0; ii < Content.length(); ii++)
 				{
-					if ((Content[ii] >= '0' && Content[ii] <= '9') || toupper(Content[ii]) == 'E' || toupper(Content[ii]) == '.'
+					if ((Content[ii] >= '0' && Content[ii] <= '9') || toupper(Content[ii]) == 'E' || Content[ii] == '.'
 						|| Content[ii] == '+' || Content[ii] == '-') continue;
 					return "\"" + wb::json::JsonString::Escape(Content) + "\"";
 				}
+
 				// It is entirely numeric.  Omit quotes.
 				return Content;
 			}
@@ -229,8 +235,11 @@ namespace wb
 					{
 					*/
 					AddIndent(Options, ret);
+					bool UnquoteNumbers = Options.UnquoteNumbers;
+					Options.UnquoteNumbers = false;					// JSON keys are always quoted, even though values can be numbers.
 					if (KVP.first == nullptr) ret += "\"\"";		// JSON does not permit a null key, so there is no perfect representation of the YAML here.
 					else ret += KVP.first->ToJson(Options);
+					Options.UnquoteNumbers = UnquoteNumbers;
 					//}
 
 					ret += ": ";

@@ -71,7 +71,7 @@ namespace wb
 			bool IsWhitespace(char ch) { return ch == ' ' || ch == '\t'; }
 			bool IsLinebreak(char ch) { return ch == '\r' || ch == '\n'; }		// Note, YAML 1.2: "Line breaks inside scalar content must be normalized by the YAML processor. Each such line break must be parsed into a single line feed character."						
 
-			// Calls Advance() to pass all whitespace at the current position and returns a count of the whitespace that was skipped over.			
+			// Calls Advance() to pass all whitespace at the current position and returns a count of the whitespace that was skipped over.  CurrentIndent is not updated.
 			int AdvanceWhitespace();
 
 			// Call AdvanceLine() while Current is a linebreak character to correctly step over the current and possibly a following linebreak character that should
@@ -1268,7 +1268,9 @@ namespace wb
 						if (!Advance()) throw FormatException("Anchor name specified without node content at " + GetSource() + ".");
 					}
 
-					// Remove the anchor as affecting the indent.  Although really the key to this is parsing the whitespace above, since we didn't increment CurrentIndent.
+					// Don't count the &anchor or whitespace after it as indent when we call FindNextContent() later.
+					AdvanceWhitespace();
+					// Remove the anchor as affecting the indent.  Although really the key to this is parsing the whitespace above, since we didn't increment CurrentIndent.					
 					CurrentIndent = IndentAtStart;			
 					// Default the alias to nullptr, in case we return a nullptr before we end up parsing a node.
 					Aliases[anchor] = nullptr;
@@ -1285,6 +1287,9 @@ namespace wb
 						if (!Advance()) throw FormatException("Tag (!) handle specified without node at " + GetSource() + ".");
 					}
 					Tag = handle;
+
+					// Don't count the !tag or whitespace after it as indent when we call FindNextContent() later.
+					AdvanceWhitespace();
 					continue;
 				}				
 

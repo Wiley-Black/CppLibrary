@@ -460,11 +460,49 @@ namespace wb
 			}
 		};
 
-		inline bool IsEqual(unique_ptr<JsonValue>& pA, const unique_ptr<JsonValue>& pB)
+		/// <summary>
+		/// Compares to JsonValues, including any subnodes in sequences or mappings.
+		/// </summary>		
+		/// <param name="Strict">
+		/// If true, then the values must be completely identical.  If false, then strings, booleans, null,
+		/// and numbers can be considered equivalent if they would be identical when both were cast as
+		/// strings.  For example, if not strict, then "false" (JsonString) and false (JsonBoolean) are 
+		/// considered equivalent.
+		/// </param>		
+		/// <returns>True if the values are identical.</returns>
+		inline bool IsEqual(unique_ptr<JsonValue>& pA, const unique_ptr<JsonValue>& pB, bool Strict = true)
 		{
+			if (Strict)
+			{
+				// JsonNumber is a derived class of JsonString, so we have to carefully check that the types
+				// are both JsonNumber in strict mode.
+				if (is_type<JsonNumber>(pA) && !is_type<JsonNumber>(pB)) return false;
+				if (is_type<JsonString>(pA) && is_type<JsonNumber>(pB)) return false;
+				// Now that we've verified the types, we can proceed to compare as strings.
+			}
+			else
+			{
+				// In non-strict mode, see if we can convert to strings and compare.
+				string a_string, b_string;
+
+				if (is_type<JsonBoolean>(pA)) a_string = ((JsonBoolean*)pA.get())->Value ? "true" : "false";
+				else if (is_type<JsonNull>(pA)) a_string = "null";
+				else if (is_type<JsonString>(pA)) a_string = ((JsonString*)pA.get())->Content;
+
+				if (is_type<JsonBoolean>(pB)) b_string = ((JsonBoolean*)pB.get())->Value ? "true" : "false";
+				else if (is_type<JsonNull>(pB)) b_string = "null";
+				else if (is_type<JsonString>(pB)) b_string = ((JsonString*)pB.get())->Content;
+
+				// If both of them are empty strings, they will fall through and do the normal 
+				// string comparison that will still return true.  If only one of them was convertable to
+				// a string, or already a string, then they won't be equal unless the other was also convertable
+				// or an equal string.
+				if (a_string.length() > 0 || b_string.length() > 0) return wb::IsEqual(a_string, b_string);
+			}
+
 			if (is_type<JsonString>(pA) || is_type<JsonNumber>(pA))
 			{
-				if (!is_type<JsonString>(pB) && !is_type<JsonString>(pB)) return false;
+				if (!is_type<JsonString>(pB)) return false;
 				return wb::IsEqual(((JsonString*)pA.get())->Content, ((JsonString*)pB.get())->Content);
 			}
 			else if (is_type<JsonNull>(pA))
@@ -484,7 +522,7 @@ namespace wb
 				if (pAs->Elements.size() != pBs->Elements.size()) return false;
 				for (auto ii = 0; ii < pAs->Elements.size(); ii++)
 				{
-					if (!IsEqual(pAs->Elements[ii], pBs->Elements[ii])) return false;
+					if (!IsEqual(pAs->Elements[ii], pBs->Elements[ii], Strict)) return false;
 				}
 				return true;
 			}
@@ -500,7 +538,7 @@ namespace wb
 				{
 					auto b_it = pBm->Map.find(a_kvp.first);
 					if (b_it == pBm->Map.end()) return false;		// Key from a was not present in b.
-					if (!IsEqual(a_kvp.second, b_it->second)) return false;
+					if (!IsEqual(a_kvp.second, b_it->second, Strict)) return false;
 				}
 				return true;
 			}
