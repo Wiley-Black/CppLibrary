@@ -47,6 +47,18 @@ namespace wb
 {
 	namespace xml
 	{
+		/// <summary>
+		/// StreamParser provides the base class for parsing from a stream that is used by several of the
+		/// text parsers in this library: XmlParser, JsonParser, and YamlParser.  It tracks the current
+		/// line number by monitoring for linefeeds while also managing a 'Current' character and a
+		/// lookahead buffer as requested by the caller.  
+		/// 
+		/// MaxLoading specifies the maximum number of lookahead characters (including Current) that 
+		/// are allowed and equivalently MaxLoading gives the largest value that can be passed to the 
+		/// Need() function successfully.  The actual lookahead buffer is one character larger than 
+		/// MaxLoading to stick to powers-of-2 allocation, but the last character is never used 
+		/// (Current also provides one lookahead character).
+		/// </summary>
 		template<int MaxLoading = 64 /*bytes*/> class StreamParser
 		{
 		protected:
@@ -104,6 +116,9 @@ namespace wb
 			/// </summary>
 			bool IsNextEqual(const string& match);
 
+			/// <summary>
+			/// Makes the MaxLoading template argument accessible.  See the class summary for details.
+			/// </summary>
 			int GetMaxLoading() const { return MaxLoading; }
 
 		public:

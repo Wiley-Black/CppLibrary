@@ -87,6 +87,7 @@ namespace wb
 
 			string	ToJsonValue(bool UnquoteNumbers)
 			{
+				if (Null) return "null";
 				if (!UnquoteNumbers) return "\"" + wb::json::JsonString::Escape(Content) + "\"";
 
 				// Check if the value is entirely numeric...
@@ -107,12 +108,13 @@ namespace wb
 			}
 
 		public:			
-			YamlScalar(string FromSource, string Text = "") : base(FromSource), Content(Text) { }
+			YamlScalar(string FromSource, string Text, bool IsNull) : base(FromSource), Content(Text), Null(IsNull) { }
 
 			YamlScalar(const YamlScalar&) = default;
 			YamlScalar& operator=(const YamlScalar&) = default;
 
 			string	Content;
+			bool	Null;
 			
 			unique_ptr<YamlNode>	DeepCopy() override {
 				return unique_ptr<YamlNode>(new YamlScalar(*this));
@@ -120,7 +122,7 @@ namespace wb
 
 			string	ToJson(JsonWriterOptions Options = JsonWriterOptions()) override
 			{
-				string ret;								
+				string ret;				
 				ret += ToJsonValue(Options.UnquoteNumbers);
 				return ret;
 			}
@@ -196,7 +198,7 @@ namespace wb
 				auto it = Map.find(pFrom);
 				if (it != Map.end()) throw FormatException("Duplicate keys found at " + pFrom->Source + " and " + it->first->Source + " are not permitted in mapping at " + Source + ".");
 				Map.insert(make_pair<unique_ptr<YamlNode>, unique_ptr<YamlNode>>(std::move(pFrom), std::move(pTo)));
-			}			
+			}
 
 			unique_ptr<YamlNode>	DeepCopy() override {
 				auto pRet = make_unique<YamlMapping>(Source);

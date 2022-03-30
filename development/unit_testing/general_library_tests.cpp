@@ -143,6 +143,114 @@ TEST(Library, XML)
 
 #pragma region "Yaml (and Json) Parser Testing"
 
+#include "Parsing/Yaml/YamlEventParser.h"
+class YamlEventLogParser : public wb::yaml::YamlEventParser
+{
+	string log;
+
+protected:
+
+	void OnOpenEvent(Event Event, string Anchor, string Tag, bool FlowStyleOrExplicit = false) override
+	{
+		string entry = "+";		
+		switch (Event)
+		{
+		case Event::Stream: entry += "STR"; break;
+		case Event::Document: 
+			entry += "DOC"; 			
+			if (!Anchor.empty()) entry += " &" + Anchor;
+			if (!Tag.empty()) entry += " " + Tag;
+			if (FlowStyleOrExplicit) entry += " ---";
+			break;
+		case Event::Map: 
+			entry += "MAP"; 			
+			if (!Anchor.empty()) entry += " &" + Anchor;
+			if (!Tag.empty()) entry += " " + Tag;
+			if (FlowStyleOrExplicit) entry += " {}";
+			break;
+		case Event::Sequence:
+			entry += "SEQ";			
+			if (!Anchor.empty()) entry += " &" + Anchor;
+			if (!Tag.empty()) entry += " " + Tag;
+			if (FlowStyleOrExplicit) entry += " []";
+			break;
+		default:
+			throw NotImplementedException("Unrecognized Event type.");
+		}
+		log += entry + "\n";
+	}
+
+	void OnCloseEvent(Event Event, bool Explicit) override
+	{
+		switch (Event)
+		{
+		case Event::Stream: log += "-STR"; break;
+		case Event::Document: 
+			if (Explicit)
+				log += "-DOC ...";
+			else
+				log += "-DOC"; 
+			break;
+		case Event::Map: log += "-MAP"; break;
+		case Event::Sequence: log += "-SEQ"; break;
+		default:
+			throw NotImplementedException("Unrecognized Event type.");
+		}
+		log += "\n";
+	}
+
+	void OnValueEvent(string Value, string Anchor, string Tag, Flags flags = NoFlags)
+	{
+		wb::yaml::string_ReplaceAll(Value, "\\", "\\\\");
+		wb::yaml::string_ReplaceAll(Value, "\n", "\\n");
+		wb::yaml::string_ReplaceAll(Value, "\t", "\\t");
+
+		log += "=VAL";		
+		if (Anchor.length()) log += " &" + Anchor;
+		if (Tag.length()) log += " " + Tag;
+		
+		if (flags == NoFlags)
+			log += " :" + Value;
+		else if (flags == TextWasSingleQuoted)
+			log += " \'" + Value;
+		else if (flags == TextWasDoubleQuoted)
+			log += " \"" + Value;
+		else if (flags == TextWasLiteralBlock)
+			log += " |" + Value;
+		else if (flags == TextWasFoldedBlock)
+			log += " >" + Value;
+		else if (flags & NullValueFlag)
+			log += " :";
+		else throw NotSupportedException("Unrecognized flags at " + GetSource() + ".");
+
+		log += "\n";
+	}
+
+	void OnAliasEvent(string AnchorName)
+	{
+		log += "=ALI *" + AnchorName + "\n";
+	}
+
+public:
+	
+	static string Parse(wb::io::Stream& stream, const string& sSourceFilename = "")
+	{
+		YamlEventLogParser parser;		
+		parser.StartStream(stream, sSourceFilename);
+		try
+		{
+			parser.ParseTopLevel();
+			parser.FinishStream();
+			return parser.log;
+		}
+		catch (...)
+		{
+			parser.FinishStream();
+			throw;
+		}
+	}
+};
+
 bool CompareAttributes(shared_ptr<XmlAttribute>& a, shared_ptr<XmlAttribute>& b) {
 	return a->Name < b->Name; 
 }
@@ -210,6 +318,35 @@ string RemoveUnquotedJsonWhitespace(string from)
 	return ret;
 }
 
+string IsEqualWithNotes(string A, string B, string ALabel, string BLabel)
+{
+	int line_no = 1, col_no = 1;
+	for (int ii = 0; ii < A.length(); ii++)
+	{		
+		if (ii >= B.length())
+		{
+			return ALabel + " is longer than " + BLabel;
+		}
+		if (A[ii] == '\n' && B[ii] != '\n')
+		{
+			return ALabel + ":" + to_string(line_no) + " is longer than " + BLabel + ":" + to_string(line_no);
+		}
+		if (A[ii] == '\n') {
+			line_no++; col_no = 1;
+		}
+		if (A[ii] != B[ii])
+		{
+			return ALabel + ":" + to_string(line_no) + ": mismatch at column " + to_string(col_no) + ".";
+		}
+		col_no++;
+	}
+	if (B.length() > A.length())
+	{
+		return ALabel + " is shorter than " + BLabel;
+	}
+	return string();
+}
+
 #include <set>
 
 TEST(Library, YAML)
@@ -220,8 +357,8 @@ TEST(Library, YAML)
 
 	set<string>	KnownFails;
 	KnownFails.insert("4WA9");				// Explicit indentation indicators not supported.
-	KnownFails.insert("4QFQ");				// Explicit indentation indicators not supported.
-	KnownFails.insert("6XDY");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	KnownFails.insert("4QFQ");				// Explicit indentation indicators not supported.	
+#if 0
 	KnownFails.insert("2SXE");				// No anchor support.
 	KnownFails.insert("7BMT");				// No anchor support.
 	KnownFails.insert("26DV");				// No anchor support.
@@ -229,23 +366,35 @@ TEST(Library, YAML)
 	KnownFails.insert("3R3P");				// No anchor support.
 	KnownFails.insert("6KGN");				// No anchor support.
 	KnownFails.insert("7BUB");				// No anchor support.
-	KnownFails.insert("8G76");				// JSON parser requires document, empty JSON document not supported.
-	KnownFails.insert("8XYN");				// No anchor support.
+#endif	
+	//KnownFails.insert("8XYN");				// No anchor support.
+
+	// Cases that should pass YAML parsing and event generation, but that the JSON parser won't support.
+	set<string>	NoJSON;
+	NoJSON.insert("35KP");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("5TYM");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("6XDY");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("6WLZ");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("6ZKB");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("7Z25");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("8G76");				// JSON parser requires document, empty JSON document not supported.
+	NoJSON.insert("9DXL");				// JSON parser only reads a single document.  This isn't really valid JSON.
 
 	/** Scan directory for test cases that we can use **/
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
 	for (auto& diCase : diBase.EnumerateDirectories())
 	{
 		// Locate .yaml and .json files within subfolder...
-		FileInfo YamlFile, JsonFile;
+		FileInfo YamlFile, JsonFile, YamlEventLogFile;
 		for (auto& fi : diCase.EnumerateFiles())
 		{
 			if (IsEqualNoCase(to_string(fi.GetName()), "in.yaml")) YamlFile = fi;
+			if (IsEqualNoCase(to_string(fi.GetName()), "test.event")) YamlEventLogFile = fi;
 			if (IsEqualNoCase(to_string(fi.GetName()), "in.json")) JsonFile = fi;
 		}
 
 		// If both a .yaml and .json file were found, then we can compare.
-		if (!YamlFile.IsEmpty() && !JsonFile.IsEmpty())
+		if (!YamlFile.IsEmpty() && !JsonFile.IsEmpty() && !YamlEventLogFile.IsEmpty())
 		{
 			string snippet_id = to_string(diCase.GetName());
 			if (KnownFails.count(snippet_id))
@@ -256,18 +405,86 @@ TEST(Library, YAML)
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
 
 bool hit = false;
-//if (!IsEqual(snippet_id, "93JH")) continue;
+//if (!IsEqual(snippet_id, "8G76")) continue;
 hit = true;
-			
+
+			string YamlParsedEventLog;
+			try
+			{
+				io::FileStream fsYaml(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);
+				YamlParsedEventLog = YamlEventLogParser::Parse(fsYaml, to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));
+			}
+			catch (std::exception& ex)
+			{
+				std::cout << "\nFailure during YAML Parsing of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n" 
+					<< "\nOriginal YAML:\n" << io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read))
+					<< "\n"
+					;
+				continue;
+			}
+
+			string YamlEventLogFromFile;
+			try
+			{				
+				io::FileStream fsLog(YamlEventLogFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);
+				YamlEventLogFromFile = StreamToString(fsLog);
+			}
+			catch (std::exception& ex)
+			{
+				std::cout << "\nFailure while reading YAML event log of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n";
+				continue;
+			}			
+
+			YamlParsedEventLog = Trim(YamlParsedEventLog);
+			YamlEventLogFromFile = Trim(YamlEventLogFromFile);
+
+			string diff = IsEqualWithNotes(YamlParsedEventLog, YamlEventLogFromFile, "Results", "expected");
+			if (diff.length())
+			{
+				std::cout << "\nMismatch of YAML to target YAML event log in test case '" << snippet_id << "':"
+					<< "\nOriginal YAML:\n" << io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read))
+					<< "\nYAML events:\n" << YamlParsedEventLog << "\n"
+					<< "\nYAML expected events:\n" << YamlEventLogFromFile << "\n"
+					<< "\n" << diff << "\n"					
+					;
+				continue;
+			}
+			/*
+			else
+			{
+				std::cout << "\nMATCH '" << snippet_id << "':"
+					<< "\nYAML events:\n" << YamlParsedEventLog << "\n"
+					<< "\nYAML expected events:\n" << YamlEventLogFromFile << "\n"
+					;
+				continue;
+			}
+			*/
+
+#if 1
+
+			if (NoJSON.count(snippet_id))
+			{
+				std::cout << "SKIP JSON: " << snippet_id << " [known to not be supported by JSON parser]\n";
+				continue;
+			}
+
 			string YamlParsedToJson;			
 			try
 			{
 				io::FileStream fsYaml(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);
-				auto pNode = wb::yaml::YamlParser::Parse(fsYaml, to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));
+				auto Documents = wb::yaml::YamlParser::Parse(fsYaml, to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));				
 				wb::yaml::JsonWriterOptions Options;
 				Options.UnquoteNumbers = true;
-				if (pNode == nullptr) pNode = unique_ptr<wb::yaml::YamlNode>(new wb::yaml::YamlScalar("empty document"));
-				YamlParsedToJson = pNode->ToJson(Options);
+				//if (pNode == nullptr) pNode = unique_ptr<wb::yaml::YamlNode>(new wb::yaml::YamlScalar("empty document"));
+				if (Documents.size() == 0) throw NotSupportedException("No document received from YamlParser.");
+				if (Documents.size() > 1) {
+					std::cout << "\nMultiple documents received from YamlParser in test case '" << snippet_id << "':"
+						<< "\nOriginal YAML:\n" << io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read))
+						<< "\nYAML Event Log:\n" << YamlEventLogFromFile << "\n"
+						;
+					throw NotSupportedException("Multiple document received from YamlParser- can't compare to JSON b/c JSON parser only supports single document.");
+				}
+				YamlParsedToJson = Documents[0]->ToJson(Options);
 			}
 			catch (std::exception& ex)
 			{
@@ -306,13 +523,16 @@ hit = true;
 			if (!json::IsEqual(pYamlParsedToJsonParsed, pJsonParsed, /*Strict=*/ false))
 			{
 				std::cout << "\nMismatch of YAML to target JSON in test case '" << snippet_id << "':"
+					<< "\nOriginal YAML:\n" << io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read))
 					<< "\nYAML -> JSON:\n" << pYamlParsedToJsonParsed->ToString() << "\n"
 					//<< "\nYAML -> JSON -> XML -> JSON:\n" << YamlParsedToJsonToXmlToJson << "\n" 
 					<< "\nJSON:\n" << pJsonParsed->ToString() << "\n"
 					//<< "\nJSON -> XML -> JSON:\n" << JsonParsedToXmlToJson << "\n"
+					<< "\nYAML Event Log:\n" << YamlEventLogFromFile << "\n"
 					;
 				continue;
 			}
+#endif
 		}
 	}	
 }

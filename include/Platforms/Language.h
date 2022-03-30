@@ -116,6 +116,16 @@ template<typename Target, typename Source> static inline bool is_type(const std:
 }
 
 /// <summary>
+/// is_type() is a helper function that tests whether the given pointer can be dynamic_cast to another pointer type.  
+/// </summary>
+/// <seealso>dynamic_pointer_movecast()</seealso>
+/// <returns>True if the pointer can be cast to the specified type.  False if the pointer has a nullptr value or is 
+/// not castable to the templated Target type as a pointer.</returns>
+template<typename Target, typename Source> static inline bool is_type(const std::shared_ptr<Source>& ptr) {
+	return dynamic_cast<Target*>(ptr.get()) != nullptr;
+}
+
+/// <summary>
 /// dynamic_pointer_movecast() is a helper function that transfers from one unique_ptr to another unique_ptr while performing a dynamic typecast.  If the
 /// original pointer is null or if the dynamic cast yields a nullptr (because the original pointer cannot be cast to the Target* type), then
 /// the original object is deleted and a nullptr is returned.  In all cases, the original pointer is released.

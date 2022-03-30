@@ -124,6 +124,8 @@ namespace wb
 			}
 		}
 
+		inline string StreamToString(Stream&& Source) { return StreamToString((Stream&)Source); Source.Close(); }
+
 		inline string ReadToEnd(Stream& Source)
 		{
 			string ret;

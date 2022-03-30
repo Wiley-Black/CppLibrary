@@ -303,6 +303,9 @@
     <ClInclude Include="..\include\Parsing\Json\JsonParser.h">
       <Filter>Parsing\Json</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\Parsing\Yaml\YamlEventParser.h">
+      <Filter>Parsing\Yaml</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\Readme.txt" />

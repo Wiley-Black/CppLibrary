@@ -70,6 +70,7 @@
     <ClInclude Include="..\include\Parsing\Xml\Xml.h" />
     <ClInclude Include="..\include\Parsing\Xml\XmlParser.h" />
     <ClInclude Include="..\include\Parsing\Yaml\Yaml.h" />
+    <ClInclude Include="..\include\Parsing\Yaml\YamlEventParser.h" />
     <ClInclude Include="..\include\Parsing\Yaml\YamlParser.h" />
     <ClInclude Include="..\include\Platforms\Language.h" />
     <ClInclude Include="..\include\Platforms\Platforms.h" />
