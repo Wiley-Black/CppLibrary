@@ -25,6 +25,7 @@ namespace wb
 #include "../../Foundation/STL/Collections/Map.h"
 #include "../../IO/Streams.h"
 #include "../../IO/MemoryStream.h"
+#include "../BaseTypeParsing.h"
 
 /** Content **/
 
@@ -92,6 +93,17 @@ namespace wb
 
 				// Check if the value is entirely numeric...
 				if (Content.length() == 0) return "\"\"";
+				if (Content.length() > 2 && Content[0] == '0' && Content[1] == 'x')
+				{
+					// Hex number, write to JSON as decimal.
+					UInt64 Value;
+					if (UInt64_TryParse(Content, NumberStyles::Integer, Value))
+					{
+						char buffer[26];
+						_ui64toa_s(Value, buffer, 26, 10);
+						return wb::json::JsonString::Escape(buffer);
+					}
+				}
 				if (!(Content[0] >= '0' && Content[0] <= '9') && Content[0] != '.'
 					&& Content[0] != '+' && Content[0] != '-')
 					return "\"" + wb::json::JsonString::Escape(Content) + "\"";

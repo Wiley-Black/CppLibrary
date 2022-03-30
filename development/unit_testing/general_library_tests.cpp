@@ -164,15 +164,15 @@ protected:
 			break;
 		case Event::Map: 
 			entry += "MAP"; 			
-			if (!Anchor.empty()) entry += " &" + Anchor;
-			if (!Tag.empty()) entry += " " + Tag;
 			if (FlowStyleOrExplicit) entry += " {}";
+			if (!Anchor.empty()) entry += " &" + Anchor;
+			if (!Tag.empty()) entry += " " + Tag;			
 			break;
 		case Event::Sequence:
 			entry += "SEQ";			
-			if (!Anchor.empty()) entry += " &" + Anchor;
-			if (!Tag.empty()) entry += " " + Tag;
 			if (FlowStyleOrExplicit) entry += " []";
+			if (!Anchor.empty()) entry += " &" + Anchor;
+			if (!Tag.empty()) entry += " " + Tag;			
 			break;
 		default:
 			throw NotImplementedException("Unrecognized Event type.");
@@ -356,18 +356,12 @@ TEST(Library, YAML)
 	std::cout << "UnitTesting: Library.YAML tests starting..." << "\n";
 
 	set<string>	KnownFails;
-	KnownFails.insert("4WA9");				// Explicit indentation indicators not supported.
-	KnownFails.insert("4QFQ");				// Explicit indentation indicators not supported.	
-#if 0
-	KnownFails.insert("2SXE");				// No anchor support.
-	KnownFails.insert("7BMT");				// No anchor support.
-	KnownFails.insert("26DV");				// No anchor support.
-	KnownFails.insert("3GZX");				// No anchor support.
-	KnownFails.insert("3R3P");				// No anchor support.
-	KnownFails.insert("6KGN");				// No anchor support.
-	KnownFails.insert("7BUB");				// No anchor support.
-#endif	
-	//KnownFails.insert("8XYN");				// No anchor support.
+	KnownFails.insert("4WA9");			// Explicit indentation indicators not supported.
+	KnownFails.insert("4QFQ");			// Explicit indentation indicators not supported.	
+	KnownFails.insert("BEC7");			// Spec calls for a warning and attempt to parse YAML 1.3, but YamlParser throws an error instead.
+	KnownFails.insert("D83L");			// Explicit indentation indicators not supported.	
+	KnownFails.insert("F6MC");			// Explicit indentation indicators not supported.	
+	KnownFails.insert("G4RS");			// Escaped unicode characters are not supported.
 
 	// Cases that should pass YAML parsing and event generation, but that the JSON parser won't support.
 	set<string>	NoJSON;
@@ -379,6 +373,11 @@ TEST(Library, YAML)
 	NoJSON.insert("7Z25");				// JSON parser only reads a single document.  This isn't really valid JSON.
 	NoJSON.insert("8G76");				// JSON parser requires document, empty JSON document not supported.
 	NoJSON.insert("9DXL");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("98YD");				// JSON parser requires document, empty JSON document not supported.
+	NoJSON.insert("9KAX");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("9WXW");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("AVM7");				// JSON parser requires document, empty JSON document not supported.
+	NoJSON.insert("HWV9");				// JSON parser requires document, empty JSON document not supported.
 
 	/** Scan directory for test cases that we can use **/
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
@@ -405,7 +404,7 @@ TEST(Library, YAML)
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
 
 bool hit = false;
-//if (!IsEqual(snippet_id, "8G76")) continue;
+//if (!IsEqual(snippet_id, "HWV9")) continue;
 hit = true;
 
 			string YamlParsedEventLog;

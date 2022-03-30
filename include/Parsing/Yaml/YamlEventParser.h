@@ -77,7 +77,7 @@ namespace wb
 			// be normalized (combined) into the first linebreak character, as well as indention.  If two linebreaks of the same character (i.e. "\n\n") occur, then 
 			// the 2nd one is not advanced over, whereas mixed characters are (i.e. "\r\n" advance twice).  Returns false if Advance() returns false.  Indention
 			// is silently counted and the current line's indention is stored in the CurrentIndent member.
-			bool AdvanceLine();												
+			bool AdvanceLine(bool TabsAsWhitespace = false);			
 			
 			/// <summary>
 			/// FindNextContent() is used throughout the YamlParser.  It advances the current position until something
@@ -97,6 +97,7 @@ namespace wb
 			string ParseScalarContentLiteral();			
 			static string Unescape(string input, string Source);
 			static string ApplyFlowFolding(string input);
+			static string ReducePlainScalar(const string& ss);
 			string ParseScalarContent(int AtIndent, Flags& TextFlags, bool& WasLinebreak, bool IgnoreColon = false);
 
 			string DecodeTag(string tag);
@@ -243,7 +244,7 @@ namespace wb
 			}
 		}
 
-		inline bool YamlEventParser::AdvanceLine()
+		inline bool YamlEventParser::AdvanceLine(bool TabsAsWhitespace)
 		{
 			CurrentIndent = 0;
 
@@ -268,10 +269,21 @@ namespace wb
 			// Next, count the current indent.
 			// Note that there may be no indent if the line break was followed by another line break immediately.
 
-			while (Current == ' ')
+			if (TabsAsWhitespace)
 			{
-				CurrentIndent++;
-				if (!Advance()) return false;
+				while (Current == ' ' || Current == '\t')
+				{
+					CurrentIndent++;
+					if (!Advance()) return false;
+				}
+			}
+			else
+			{
+				while (Current == ' ')
+				{
+					CurrentIndent++;
+					if (!Advance()) return false;
+				}
 			}
 			return true;
 		}
@@ -443,7 +455,7 @@ namespace wb
 			// content information. Once all such spaces have been discarded, all line breaks are folded without exception.
 
 			// The combined effect of the flow line folding rules is that each “paragraph” is interpreted as a line, empty lines are interpreted as 
-			// line feedsand text can be freely more - indented without affecting the content information."
+			// line feeds and text can be freely more - indented without affecting the content information."
 
 			// Precondition: when in quotes, ParseScalarContent() captures the linebreaks as a single \n character and does not apply folding until
 			// close of the quotations, at which time ApplyFlowFolding is called to discard spaces and fold.
@@ -529,6 +541,45 @@ namespace wb
 			return ret;
 		}		
 
+		/*static*/ inline string YamlEventParser::ReducePlainScalar(const string& ss)
+		{
+			// Example 7.12: All leading and trailing white space characters are excluded from the content. Each continuation line 
+			// must therefore contain at least one non-space character.
+
+			// Section 6.5 Line Folding
+			// If a line break is followed by an empty line, it is trimmed; the first line break is discarded and the rest are retained as content.
+			// Otherwise (the following line is not empty), the line break is converted to a single space (x20).
+			
+			string ret;			
+			string Pending = "";
+			for (int ii = 0; ii < ss.length(); ii++)
+			{
+				if (ss[ii] == ' ' || ss[ii] == '\t') { Pending += ss[ii]; continue; }
+				if (ss[ii] == '\n') { Pending += '\n'; continue; }
+				
+				// Non-whitespace -> line is no longer empty.
+				int linefeeds = 0;
+				for (int jj = 0; jj < Pending.length(); jj++) if (Pending[jj] == '\n') linefeeds++;
+				if (linefeeds == 0) ret += Pending;
+				if (linefeeds > 0)
+				{
+					if (linefeeds > 1) ret += string(linefeeds - 1, '\n');
+					else ret += ' ';
+				}
+				Pending.clear();
+				ret += ss[ii];
+			}
+
+			int linefeeds = 0;
+			for (int jj = 0; jj < Pending.length(); jj++) if (Pending[jj] == '\n') linefeeds++;			
+			if (linefeeds > 0)
+			{
+				if (linefeeds > 1) ret += string(linefeeds - 1, '\n');
+				else ret += ' ';
+			}
+			return ret;
+		}
+
 		/// <summary>
 		/// ParseScalarContent() parses text until an indicator or other syntax is encountered.  Empty nodes are possible in
 		/// Yaml, so ParseScalarContent() may return an empty string.  ParseScalarContent() is guaranteed to call Advance()
@@ -553,7 +604,10 @@ namespace wb
 			AdvanceWhitespace();
 			for (;;)
 			{
-				if (!Need(1)) return ret;
+				if (!Need(1)) {
+					if (ParsingQuote) throw FormatException("Quote starting scalar without matching closing quote at " + GetSource() + ".");
+					return ReducePlainScalar(ret);
+				}
 
 				if (Current == '\'' && (ret.empty() || ParsingQuote == '\''))
 				{
@@ -635,6 +689,8 @@ namespace wb
 						continue;
 					}
 					
+					ret += "\n";
+
 					/*
 					if (ParsingQuote != 0)
 					{
@@ -645,15 +701,17 @@ namespace wb
 					*/
 					WasLinebreak = true;
 					
+					/*
 					if (EmptyLine) {
 						if (ret.length() > 0 && ret[ret.length() - 1] == ' ') ret = ret.substr(0, ret.size() - 1);		// For 36F6: clobber one whitespace if \n follows.
 						ret += "\n";
 					}
 					else ret += " ";
+					*/
 
-					if (!AdvanceLine()) {
+					if (!AdvanceLine(true)) {
 						if (ParsingQuote != 0) throw FormatException("Unterminated YAML quotation (" + string(1, ParsingQuote) + ") at " + GetSource() + ".");
-						return ret;
+						return ReducePlainScalar(ret);
 					}
 					EmptyLine = true;
 
@@ -673,7 +731,7 @@ namespace wb
 						// We're in plain, so skip over the comment and proceed.
 						while (!IsLinebreak(Current))
 						{
-							if (!Advance()) return ret;
+							if (!Advance()) return ReducePlainScalar(ret);
 						}
 					}
 
@@ -689,14 +747,14 @@ namespace wb
 					case Styles::BlockSequence:
 					case Styles::BlockMapping:
 						if (CurrentIndent < IndentOfBlock && ParsingQuote == 0) {
-							return Trim(ret);
+							return ReducePlainScalar(Trim(ret));
 						}
 						break;
 					case Styles::FlowMapping:					
-						if (!ParsingQuote && (Current == ',' || Current == '}')) return Trim(ret);
+						if (!ParsingQuote && (Current == ',' || Current == '}')) return ReducePlainScalar(Trim(ret));
 						break;
 					case Styles::FlowSequence:
-						if (!ParsingQuote && (Current == ',' || Current == ']')) return Trim(ret);
+						if (!ParsingQuote && (Current == ',' || Current == ']')) return ReducePlainScalar(Trim(ret));
 						break;
 					}
 					if (FirstLinebreak)
@@ -706,7 +764,9 @@ namespace wb
 					}
 					else
 					{
-						if (CurrentIndent > IndentOfBlock) ret += string(CurrentIndent - IndentOfBlock, ' ');
+						// Example 7.12: All leading and trailing white space characters are excluded from the content. Each continuation line 
+						// must therefore contain at least one non-space character.
+						//if (CurrentIndent > IndentOfBlock) ret += string(CurrentIndent - IndentOfBlock, ' ');
 					}
 					continue;
 					//if (Trim(ret).length() > 0) { WasLinebreak = true; return ret; }
@@ -723,17 +783,19 @@ namespace wb
 					if (Need(2) && pNext[0] == '#')
 					{
 						if (!Advance(2)) return ret;
-						while (!IsLinebreak(Current)) { if (!Advance()) return ret; }
+						while (!IsLinebreak(Current)) { if (!Advance()) return ReducePlainScalar(ret); }
 						// Loop so as to hit the IsLinebreak() test.
 						continue;
 					}
+					/*
 					if (EmptyLine)
 					{
-						if (!Advance()) return ret;
+						if (!Advance()) return ReducePlainScalar(ret);
 						continue;
 					}
+					*/
 					ret += Current;
-					if (!Advance()) return ret;
+					if (!Advance()) return ReducePlainScalar(ret);
 					continue;
 				}				
 				if (!IgnoreColon && Current == ':' 
@@ -741,20 +803,33 @@ namespace wb
 					 || !Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
 				{
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator (: ) found.");		// Should have been detected & handled at higher-level.
-					return ret;		// The ": " combination is an indicator, but what precedes it constitutes the scalar content.
+					return ReducePlainScalar(ret);		// The ": " combination is an indicator, but what precedes it constitutes the scalar content.
 				}
 				if (Current == '-' && Need(3) && pNext[0] == '-' && pNext[1] == '-'
 				 && (!Need(4) || pNext[2] == ' ' || pNext[2] == '\t' || IsLinebreak(pNext[2])))
 				{
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": end indicator (---) found.");		// Should have been detected & handled at higher-level.
-					return ret;
+					return ReducePlainScalar(ret);
 				}
 				if (Current == '-' && (ret.empty() || ret[ret.length()-1] == ' ' || ret[ret.length()-1] == '\t' || ret[ret.length()-1] == '\n'))
 				{
 					if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
 					{
+						if (CurrentStyle == Styles::BlockSequence && CurrentIndent + 1 > CurrentBlockIndent && !ret.empty())
+						{
+							/** Test case AB8U:
+							*	- single multiline
+							*	 - sequence entry
+							* 
+							*   Described as "Sequence entry that looks like two with wrong indentation".
+							*/
+							ret += "-";
+							Advance();			// Must not fail because Need(2) was true.
+							continue;
+						}
+
 						if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator (- ) found.");		// Should have been detected & handled at higher-level.
-						return ret;		// Detected a block sequence (8.2.1) marker.
+						return ReducePlainScalar(ret);		// Detected a block sequence (8.2.1) marker.
 					}
 				}
 				if (Current == '.')
@@ -762,7 +837,7 @@ namespace wb
 					if (Need(3) && pNext[0] == '.' && pNext[1] == '.')
 					{
 						if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": indicator (...) found.");		// Should have been detected & handled at higher-level.
-						return ret;			// Detected an end-of-document marker.
+						return ReducePlainScalar(ret);			// Detected an end-of-document marker.
 					}
 				}
 				if (Current == '|' || Current == '>')
@@ -792,21 +867,21 @@ namespace wb
 				if (CurrentStyle == Styles::FlowMapping && (Current == ',' || Current == '}'))
 				{
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": unexpected indicator (" + string(1,Current) + ") found in flow mapping.");		// Should have been detected & handled at higher-level.
-					return ret;
+					return ReducePlainScalar(ret);
 				}
 				if (CurrentStyle == Styles::FlowSequence && (Current == ',' || Current == ']'))
 				{
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": unexpected indicator (" + string(1, Current) + ") found in flow sequence.");		// Should have been detected & handled at higher-level.
-					return ret;
+					return ReducePlainScalar(ret);
 				}
 				if (ret.empty() && (Current == '[' || Current == ']' || Current == '{' || Current == '}' || Current == ','))
 				{
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": unexpected indicator (" + string(1, Current) + ") found.");		// Should have been detected & handled at higher-level.
-					return ret;
+					return ReducePlainScalar(ret);
 				}
 				ret += Current;
 				EmptyLine = false;
-				if (!Advance()) return ret;
+				if (!Advance()) return ReducePlainScalar(ret);
 			}
 		}
 		
@@ -954,7 +1029,7 @@ namespace wb
 					// Don't count the !tag or whitespace after it as indent.  But a newline would restart the counter.
 					CountingIndent = false;
 					continue;
-				}
+				}				
 
 				if (Current == '&')
 				{
@@ -970,6 +1045,13 @@ namespace wb
 					// Don't count the &anchor or whitespace after it as indent.  But a newline would restart the counter.
 					CountingIndent = false;
 					continue;
+				}
+
+				if (Current == '[' || Current == '{')
+				{
+					if (tag.length()) block_tag = tag;
+					if (anchor.length()) block_anchor = anchor;
+					tag = anchor = string();
 				}
 
 				return true;
@@ -1124,7 +1206,7 @@ namespace wb
 			if (Flags == NoFlags) Text = Trim(Text);		// NoFlags = "plain" in this case.
 
 bool hit = false;
-if (Text == "top6")
+if (Text == "empty")
 	hit = true;
 
 			OnValueEvent(Text, Flags);
@@ -1155,53 +1237,73 @@ if (Text == "top6")
 				{
 					OnNullValueEvent();						// Null key.
 					OnNullValueEvent();						// Null value.
-					break;
+					return;
 				}
 				if (!Need(1))
 				{
 					OnNullValueEvent();						// Null value.
-					break;
-				}
-				if (CurrentIndent < QuestionMarkIndent)
-				{
-					OnNullValueEvent();						// Null value.
-					break;
+					return;
 				}				
-				if (Current == '?' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+				if (CurrentIndent == QuestionMarkIndent)
 				{
-					OnNullValueEvent();						// Null value.
-					Advance(); CurrentIndent++;
-					continue;
-				}
-				else if (Current == ':' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
-				{
-					Advance(); CurrentIndent++;
-					if (!ParseUnknownBlock(QuestionMarkIndent + 1))
-					{
-						OnNullValueEvent();						// Null value.
-						break;
-					}
-
 					if (Current == '?' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
 					{
-						// Continue the explicit BlockMapping, same indent, no need to open or close.
+						OnNullValueEvent();						// Null value.
 						Advance(); CurrentIndent++;
 						continue;
 					}
-					else break;
+					else if (Current == ':' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{
+						Advance(); CurrentIndent++;
+						if (!ParseUnknownBlock(QuestionMarkIndent + 1))
+						{
+							OnNullValueEvent();						// Null value.
+							return;
+						}
+
+						if (CurrentIndent == QuestionMarkIndent && Current == '?' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+						{
+							// Continue the explicit BlockMapping, same indent, no need to open or close.
+							Advance(); CurrentIndent++;
+							continue;
+						}
+						else if (ColonLookahead())
+						{
+							/** Test case GH63: transition from explicit to implicit mappings:
+							*	? a
+							*   : 1.3
+							*   fifteen: d
+							*/
+							// Note: intentionally not opening or closing the mapping here, it is
+							// an attachment to the current explicit mapping.
+							ParseNode(Styles::BlockMapping, CurrentIndent);
+							return;
+						}
+						else return;
+						//else throw FormatException("Unexpected content following explicit mapping at " + GetSource() + ".");
+					}
+					else if (ColonLookahead()) {
+						/** Proceed as if we are in an ordinary block mapping, which allows additional key:value pairs
+						*	to become attached to this mapping.  Test case 7W2P:
+						*
+						*	? a
+						*	? b
+						*	c:
+						*/
+						OnNullValueEvent();						// Null value.
+						ParseNode(Styles::BlockMapping, QuestionMarkIndent);
+						return;
+					}
+					else return;
+					//else throw FormatException("Unexpected content following explicit mapping at " + GetSource() + ".");
 				}
-				else {
-					/** Proceed as if we are in an ordinary block mapping, which allows additional key:value pairs
-					*	to become attached to this mapping.  Test case 7W2P:
-					*
-					*	? a
-					*	? b
-					*	c:
-					*/
+				else if (CurrentIndent < QuestionMarkIndent)
+				{
 					OnNullValueEvent();						// Null value.
-					ParseNode(Styles::BlockMapping, QuestionMarkIndent);
 					return;
 				}
+				else return;
+				//else throw FormatException("Unexpected content following explicit mapping at " + GetSource() + ".");
 			}
 		}
 
@@ -1249,6 +1351,13 @@ if (Text == "top6")
 			*				After the baz1 block has been parsed, ParseNode() loops.
 			*				ParseNode() sees the 3rd line dash at a current indent of 2 effective 3 and a ParseUnknownBlock(AtIndent=3) call is made.
 			*					ParseUnknownBlock returns the "baz2" scalar.						
+			* 
+			*	Test case 'AB8U':
+			* 
+			*	- single multiline
+			*	 - sequence entry
+			* 
+			*	Parses as +SEQ, =VAL :single multiline - sequence entry.
 			*/
 
 			/** AtIndent should correspond to where the block's indent actually is.  Some examples:
@@ -1600,7 +1709,25 @@ if (Text == "top6")
 						Advance();
 						
 						if (!FindNextContent(false)) throw FormatException("Unterminated flow mapping at " + GetSource() + ".");
-						ParseAliasOrScalar(true);
+
+						if (Current == ',' || Current == '}')
+							OnNullValueEvent();
+						else if (Current == '[')
+						{
+							Advance();
+							OnOpenEvent(Event::Sequence, true);
+							ParseNode(Styles::FlowSequence, CurrentIndent + 1);
+							OnCloseEvent(Event::Sequence);
+						}
+						else if (Current == '{')
+						{
+							Advance();
+							OnOpenEvent(Event::Map, true);
+							ParseNode(Styles::FlowMapping, CurrentIndent + 1);
+							OnCloseEvent(Event::Map);
+						}
+						else
+							ParseAliasOrScalar(true);
 					}
 					else //if (Current == '?' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
 					{
@@ -1617,21 +1744,32 @@ if (Text == "top6")
 					continue;
 
 				case Styles::FlowSequence:
+				{
 					if (Current == ']')
-					{						
+					{
 						Advance();
 						return;
-					}					
-					
+					}
+
+					bool KeyValuePair = false;
+
+					// See test case 'CT4Q'.
+					if (Current == '?' && (Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{
+						Advance();
+						KeyValuePair = true;
+					}
 					// See spec section 7.4.1 / Examples 7.14, 7.19, 7.20, 7.21, and 7.22.
-					if (ColonLookahead())
+					else if (ColonLookahead()) KeyValuePair = true;
+
+					if (KeyValuePair)
 					{
 						OnOpenEvent(Event::Map, true);
 						// I may need to define a new style of "SinglePairMapping" here, since FlowMapping would search
 						// for a closing }.  I probably also have to handle the explicit case of a ?.												
 						// ParseNode(Styles::BlockMapping, CurrentIndent);
 
-						ParseAliasOrScalar();						
+						ParseAliasOrScalar();
 
 						if (!FindNextContent(false)) throw FormatException("Unterminated flow sequence at " + GetSource() + ".");
 
@@ -1641,15 +1779,31 @@ if (Text == "top6")
 							Advance();
 
 							if (!FindNextContent(false)) throw FormatException("Unterminated flow sequence at " + GetSource() + ".");
-							ParseAliasOrScalar(true);
+
+							if (Current == '{')
+							{
+								Advance();
+								OnOpenEvent(Event::Map, true);
+								ParseNode(Styles::FlowMapping, CurrentIndent + 1);
+								OnCloseEvent(Event::Map);
+							}
+							else if (Current == '[')
+							{								
+								Advance();
+								OnOpenEvent(Event::Sequence, true);
+								ParseNode(Styles::FlowSequence, CurrentIndent + 1);
+								OnCloseEvent(Event::Sequence);
+							}
+							else
+								ParseAliasOrScalar(true);
 						}
-						else 
+						else
 						{
 							// Do not advance, but need a null value entry.
 							OnNullValueEvent();						// Null value.
 						}
 
-						OnCloseEvent(Event::Map);						
+						OnCloseEvent(Event::Map);
 					}
 					else ParseAliasOrScalar();
 
@@ -1659,7 +1813,7 @@ if (Text == "top6")
 						continue;
 					}
 					continue;
-
+				}
 				default:
 					throw Exception("Unrecognized style at " + GetSource());
 				}
@@ -1729,7 +1883,7 @@ if (Text == "top6")
 			if (Current == '{')
 			{
 				Advance();
-				OnOpenEvent(Event::Map, block_anchor, block_tag, true);
+				OnOpenEvent(Event::Map, true);
 				ParseNode(Styles::FlowMapping, AtIndent + 1);
 				OnCloseEvent(Event::Map);
 				return true;
@@ -1738,7 +1892,7 @@ if (Text == "top6")
 			if (Current == '[')
 			{
 				Advance();
-				OnOpenEvent(Event::Sequence, block_anchor, block_tag, true);
+				OnOpenEvent(Event::Sequence, true);
 				ParseNode(Styles::FlowSequence, AtIndent + 1);
 				OnCloseEvent(Event::Sequence);
 				return true;
@@ -1930,7 +2084,12 @@ if (Text == "top6")
 				bool EOS = false;
 				for (;;)
 				{
-					if (!Need(1)) { EOS = true; break; }
+					if (!Need(1)) { 
+						//EOS = true; break; 
+						// Test case AVM7: no document generated here.
+						OnCloseEvent(Event::Stream);
+						return;
+					}
 
 					if (Current == ' ' || Current == '\t')
 					{
@@ -1994,6 +2153,12 @@ if (Text == "top6")
 						Advance(3);						
 						OnOpenEvent(Event::Document, /*explicitly marked=*/ true);						
 						break;
+					}
+
+					if (Need(3) && Current == '.' && pNext[0] == '.' && pNext[1] == '.')
+					{
+						Advance(3);
+						continue;
 					}
 
 					// Anything else, switch to content.
