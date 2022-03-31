@@ -355,15 +355,24 @@ TEST(Library, YAML)
 
 	std::cout << "UnitTesting: Library.YAML tests starting..." << "\n";
 
+	// Cases that this YamlEventParser implementation is known not to support:
 	set<string>	KnownFails;
 	KnownFails.insert("4WA9");			// Explicit indentation indicators not supported.
 	KnownFails.insert("4QFQ");			// Explicit indentation indicators not supported.	
-	KnownFails.insert("BEC7");			// Spec calls for a warning and attempt to parse YAML 1.3, but YamlParser throws an error instead.
+	KnownFails.insert("BEC7");			// Spec calls for a warning and attempt to parse YAML 1.3, but my implementation throws an error instead.
 	KnownFails.insert("D83L");			// Explicit indentation indicators not supported.	
 	KnownFails.insert("F6MC");			// Explicit indentation indicators not supported.	
 	KnownFails.insert("G4RS");			// Escaped unicode characters are not supported.
+	KnownFails.insert("M5C3");			// Explicit indentation indicators not supported.	
+	KnownFails.insert("P2AD");			// Explicit indentation indicators not supported.	
+	KnownFails.insert("R4YG");			// Explicit indentation indicators not supported.	
+	KnownFails.insert("Z67P");			// Explicit indentation indicators not supported.
+	KnownFails.insert("MUS6\\02");		// No support for YAML 1.1 in this implementation.
+	KnownFails.insert("MUS6\\03");		// No support for YAML 1.1 in this implementation.
+	KnownFails.insert("MUS6\\04");		// No support for YAML 1.1 in this implementation.
+	KnownFails.insert("MUS6\\06");		// No support for YAML 1.1 in this implementation.
 
-	// Cases that should pass YAML parsing and event generation, but that the JSON parser won't support.
+	// Cases that should pass YAML parsing and event generation, but that the JSON parser won't support:
 	set<string>	NoJSON;
 	NoJSON.insert("35KP");				// JSON parser only reads a single document.  This isn't really valid JSON.
 	NoJSON.insert("5TYM");				// JSON parser only reads a single document.  This isn't really valid JSON.
@@ -378,34 +387,65 @@ TEST(Library, YAML)
 	NoJSON.insert("9WXW");				// JSON parser only reads a single document.  This isn't really valid JSON.
 	NoJSON.insert("AVM7");				// JSON parser requires document, empty JSON document not supported.
 	NoJSON.insert("HWV9");				// JSON parser requires document, empty JSON document not supported.
+	NoJSON.insert("JHB9");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("KSS4");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("L383");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("M7A3");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("PUW8");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("QT73");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("RZT7");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("U9NS");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("UT92");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("W4TN");				// JSON parser only reads a single document.  This isn't really valid JSON.
+	NoJSON.insert("WZ62");				// JSON defines 'null', but this test case is using "".  However, null illegal on the key I believe.
 
-	/** Scan directory for test cases that we can use **/
+	// Scan for all subdirectories of the test-suite folder
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
-	for (auto& diCase : diBase.EnumerateDirectories())
+	vector<io::DirectoryInfo> Subdirectories = diBase.EnumerateDirectories();
+	for (int ii = 0; ii < Subdirectories.size(); ii++)
+	{
+		auto& sub = Subdirectories[ii];
+		vector<io::DirectoryInfo> subsub = sub.EnumerateDirectories();
+		if (subsub.size() > 0) Subdirectories.insert(Subdirectories.end(), subsub.begin(), subsub.end());
+		// Since we've appended more subdirectories to the end of the vector we're enumerating over, they
+		// too will get descended/walked down.
+	}
+
+	/** Scan directories for test cases that we can use **/
+	int failure_count = 0;				// Don't actually signal failure until all test cases are handled so we can see a complete picture.	
+
+	for (auto& diCase : Subdirectories)
 	{
 		// Locate .yaml and .json files within subfolder...
+		bool IsErrorCase = false;
 		FileInfo YamlFile, JsonFile, YamlEventLogFile;
 		for (auto& fi : diCase.EnumerateFiles())
 		{
 			if (IsEqualNoCase(to_string(fi.GetName()), "in.yaml")) YamlFile = fi;
 			if (IsEqualNoCase(to_string(fi.GetName()), "test.event")) YamlEventLogFile = fi;
 			if (IsEqualNoCase(to_string(fi.GetName()), "in.json")) JsonFile = fi;
+			if (IsEqualNoCase(to_string(fi.GetName()), "error")) IsErrorCase = true;
 		}
 
 		// If both a .yaml and .json file were found, then we can compare.
 		if (!YamlFile.IsEmpty() && !JsonFile.IsEmpty() && !YamlEventLogFile.IsEmpty())
 		{
-			string snippet_id = to_string(diCase.GetName());
+			string snippet_id = to_string(Path::ToRelativePath(diBase.GetFullName(), diCase.GetFullName()));
 			if (KnownFails.count(snippet_id))
 			{
 				std::cout << "SKIP: " << snippet_id << " [known to not be supported]\n";
 				continue;
 			}
+			if (IsErrorCase)
+			{
+				std::cout << "SKIP: " << snippet_id << " [error expected from this case]\n";
+				continue;
+			}
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
 
-bool hit = false;
-//if (!IsEqual(snippet_id, "HWV9")) continue;
-hit = true;
+			/** If debugging and you want to step through only a specific test case, uncomment the following and enter the snippet id.
+			*/			
+			//if (!IsEqual(snippet_id, "L24T\\01")) continue;
 
 			string YamlParsedEventLog;
 			try
@@ -415,6 +455,7 @@ hit = true;
 			}
 			catch (std::exception& ex)
 			{
+				failure_count++;
 				std::cout << "\nFailure during YAML Parsing of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n" 
 					<< "\nOriginal YAML:\n" << io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read))
 					<< "\n"
@@ -430,6 +471,7 @@ hit = true;
 			}
 			catch (std::exception& ex)
 			{
+				failure_count++;
 				std::cout << "\nFailure while reading YAML event log of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n";
 				continue;
 			}			
@@ -440,6 +482,7 @@ hit = true;
 			string diff = IsEqualWithNotes(YamlParsedEventLog, YamlEventLogFromFile, "Results", "expected");
 			if (diff.length())
 			{
+				failure_count++;
 				std::cout << "\nMismatch of YAML to target YAML event log in test case '" << snippet_id << "':"
 					<< "\nOriginal YAML:\n" << io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read))
 					<< "\nYAML events:\n" << YamlParsedEventLog << "\n"
@@ -447,19 +490,7 @@ hit = true;
 					<< "\n" << diff << "\n"					
 					;
 				continue;
-			}
-			/*
-			else
-			{
-				std::cout << "\nMATCH '" << snippet_id << "':"
-					<< "\nYAML events:\n" << YamlParsedEventLog << "\n"
-					<< "\nYAML expected events:\n" << YamlEventLogFromFile << "\n"
-					;
-				continue;
-			}
-			*/
-
-#if 1
+			}			
 
 			if (NoJSON.count(snippet_id))
 			{
@@ -487,6 +518,7 @@ hit = true;
 			}
 			catch (std::exception& ex)
 			{
+				failure_count++;
 				std::cout << "\nFailure during YAML Parsing of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n";
 				continue;
 			}
@@ -500,17 +532,14 @@ hit = true;
 			}
 			catch (std::exception& ex)
 			{
+				failure_count++;
 				std::cout << "\nFailure during JSON Re-Parsing (from YAML->JSON) of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n" << "\nYAML -> JSON:\n" << YamlParsedToJson << "\n";
 				continue;
 			}
 			
 			unique_ptr<wb::json::JsonValue> pJsonParsed;
 			try
-			{
-				// Parse as string...
-				//io::FileStream fsJson(JsonFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);
-				//JsonFromFile = StreamToString(fsJson);
-				
+			{								
 				io::FileStream fsJson(JsonFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);				
 				pJsonParsed = wb::json::JsonParser::Parse(fsJson, to_string(diCase.GetName()) + "/" + to_string(JsonFile.GetName()));				
 			}
@@ -521,19 +550,22 @@ hit = true;
 			
 			if (!json::IsEqual(pYamlParsedToJsonParsed, pJsonParsed, /*Strict=*/ false))
 			{
+				failure_count++;
 				std::cout << "\nMismatch of YAML to target JSON in test case '" << snippet_id << "':"
 					<< "\nOriginal YAML:\n" << io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read))
-					<< "\nYAML -> JSON:\n" << pYamlParsedToJsonParsed->ToString() << "\n"
-					//<< "\nYAML -> JSON -> XML -> JSON:\n" << YamlParsedToJsonToXmlToJson << "\n" 
-					<< "\nJSON:\n" << pJsonParsed->ToString() << "\n"
-					//<< "\nJSON -> XML -> JSON:\n" << JsonParsedToXmlToJson << "\n"
+					<< "\nYAML -> JSON:\n" << pYamlParsedToJsonParsed->ToString() << "\n"					
+					<< "\nJSON:\n" << pJsonParsed->ToString() << "\n"					
 					<< "\nYAML Event Log:\n" << YamlEventLogFromFile << "\n"
-					;
+					;				
 				continue;
 			}
-#endif
 		}
-	}	
+	}
+
+	if (failure_count > 0)
+	{
+		FAIL() << "\n" << to_string(failure_count) << " YAML test cases failed.\n";
+	}
 }
 
 #pragma endregion

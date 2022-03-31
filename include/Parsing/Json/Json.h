@@ -330,8 +330,8 @@ namespace wb
 
 		public:
 			JsonMapping(string FromSource) : base(FromSource) { }
-			
-			unordered_map<string, unique_ptr<JsonValue>>	Map;
+						
+			map<string, unique_ptr<JsonValue>>	Map;
 
 			void Add(const string& from, unique_ptr<JsonValue>&& pTo)
 			{

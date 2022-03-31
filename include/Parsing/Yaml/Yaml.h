@@ -104,18 +104,57 @@ namespace wb
 						return wb::json::JsonString::Escape(buffer);
 					}
 				}
+
+				// Check the first character of the number.  Here, +/- are allowed.								
 				if (!(Content[0] >= '0' && Content[0] <= '9') && Content[0] != '.'
 					&& Content[0] != '+' && Content[0] != '-')
 					return "\"" + wb::json::JsonString::Escape(Content) + "\"";
 				
-				for (auto ii = 0; ii < Content.length(); ii++)
+				bool FractionalPart = false;
+				bool ExponentialPart = false;
+				bool IsFractionalPartZero = true;
+				if (Content[0] == '.') FractionalPart = true;
+
+				// Check the whole number portion
+				int ii = 1;
+				string WholePortion;				
+				if (!FractionalPart)
 				{
-					if ((Content[ii] >= '0' && Content[ii] <= '9') || toupper(Content[ii]) == 'E' || Content[ii] == '.'
-						|| Content[ii] == '+' || Content[ii] == '-') continue;
-					return "\"" + wb::json::JsonString::Escape(Content) + "\"";
+					WholePortion += Content[0];
+					for (; ii < Content.length(); ii++)
+					{
+						if (Content[ii] >= '0' && Content[ii] <= '9') { WholePortion += Content[ii]; continue; }
+						if (toupper(Content[ii]) == 'E') { FractionalPart = false; ExponentialPart = true; ii++; break; }
+						if (Content[ii] == '.') { FractionalPart = true; ii++; break; }
+						return "\"" + wb::json::JsonString::Escape(Content) + "\"";
+					}
+				}								
+
+				if (FractionalPart)
+				{
+					for (; ii < Content.length(); ii++)
+					{
+						if (Content[ii] == '0') continue;
+						if (Content[ii] >= '1' && Content[ii] <= '9') { IsFractionalPartZero = false; continue; }
+						if (toupper(Content[ii]) == 'E') { FractionalPart = false; ExponentialPart = true; ii++; break; }
+						return "\"" + wb::json::JsonString::Escape(Content) + "\"";
+					}
+				}
+
+				if (ExponentialPart)
+				{
+					if (Content[ii] == '+' || Content[ii] == '-') ii++;
+					for (; ii < Content.length(); ii++)
+					{
+						if (Content[ii] >= '0' && Content[ii] <= '9') continue;
+						return "\"" + wb::json::JsonString::Escape(Content) + "\"";
+					}
 				}
 
 				// It is entirely numeric.  Omit quotes.
+				// While there's no real rule here, also convert whole numbers to integers to match the Yaml Json references
+				// used in the YamlParse unit tests.
+				if (IsFractionalPartZero && !ExponentialPart) return WholePortion;
 				return Content;
 			}
 
@@ -203,7 +242,7 @@ namespace wb
 		public:
 			YamlMapping(string FromSource) : base(FromSource) { }
 
-			unordered_map<unique_ptr<YamlNode>, unique_ptr<YamlNode>>	Map;			
+			map<unique_ptr<YamlNode>, unique_ptr<YamlNode>>	Map;
 
 			void Add(unique_ptr<YamlNode>&& pFrom, unique_ptr<YamlNode>&& pTo)
 			{

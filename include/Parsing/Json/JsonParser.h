@@ -165,6 +165,8 @@ namespace wb
 
 		inline unique_ptr<JsonSequence> JsonParser::ParseArray()
 		{
+			// Array in JSON is also referred to as a list or sequence.
+
 			if (Current != '[') throw FormatException("Expected opening bracket as first character in JSON array parsing at " + GetSource() + ".");
 
 			auto pRetNode = make_unique<JsonSequence>(GetSource());
@@ -198,6 +200,8 @@ namespace wb
 
 		inline unique_ptr<JsonMapping> JsonParser::ParseObject()
 		{
+			// Object in JSON is also referred to as a dictionary or mapping.
+
 			if (Current != '{') throw FormatException("Expected opening curly as first character in JSON object parsing at " + GetSource() + ".");
 
 			auto pRet = make_unique<JsonMapping>(GetSource());

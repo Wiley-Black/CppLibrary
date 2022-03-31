@@ -1,7 +1,16 @@
 /////////
 //	YamlEventParser.h
 ////
-//	Provides the bottom layer of YAML parsing by converting from a serialization stream into a sequence of events.
+/**	Provides the bottom layer of YAML parsing by converting from a serialization stream into a sequence of events.
+*	
+*	The most important aspect of this code to understand its inner workings lies in the AdvanceLine() function and
+*	the way it calculates the CurrentIndent counter after a linebreak.  The FindNextContent() function is also
+*	quite fundamental.  From the top-level, the ParseUnknownBlock() function is called and it is called again anytime
+*	there is an unknown content to follow.  ParseUnknownBlock() makes use of either ParseNode(), 
+*	ParseExplicitBlockMapping(), or ParseAliasOrScalar().  Tags and aliases are handled almost entirely at the lower
+*	levels by FindNextContent() and then by On...Event() calls, with just a few exceptions applied in defining
+*	what qualifies as a block tag/anchor vs. a regular tag/anchor.
+*/
 ////
 
 #ifndef __WBYamlEventParser_h__
@@ -79,6 +88,9 @@ namespace wb
 			// is silently counted and the current line's indention is stored in the CurrentIndent member.
 			bool AdvanceLine(bool TabsAsWhitespace = false);			
 			
+			// Used only in ParseScalarContentLiteral().
+			bool AdvanceLineUpTo(int UpToIndent, string& excess);
+
 			/// <summary>
 			/// FindNextContent() is used throughout the YamlParser.  It advances the current position until something
 			/// other than whitespace, linebreaks, and comments is found while tracking indent.  Termination of the
@@ -92,6 +104,9 @@ namespace wb
 			bool FindNextContent(bool InitiallyCountingIndent, bool FindLinebreaks = false);			
 
 			/** Scalar parsing **/
+			static string TrimStartUnlessEscaped(const string& s);
+			static string TrimEndUnlessEscaped(const string& s);
+			static string TrimUnlessEscaped(const string& s);
 			static string Chomp(string input, ChompingStyle Style);
 			static string ChompFoldList(string FoldList, ChompingStyle Style);
 			string ParseScalarContentLiteral();			
@@ -205,22 +220,46 @@ namespace wb
 
 		/*static*/ inline string YamlEventParser::Chomp(string input, ChompingStyle Style)
 		{
+			/** See spec section 8.1.1.2 Block Chomping Indicator.
+			* 
+			*	Strip:
+			*	Stripping is specified by the “-” chomping indicator. In this case, the final line break 
+			*	and any trailing empty lines are excluded from the scalar’s content.
+			* 
+			*	Clip
+			*	Clipping is the default behavior used if no explicit chomping indicator is specified. In 
+			*	this case, the final line break character is preserved in the scalar’s content. However, 
+			*	any trailing empty lines are excluded from the scalar’s content.
+			* 
+			*	Keep
+			*	Keeping is specified by the “+” chomping indicator. In this case, the final line break 
+			*	and any trailing empty lines are considered to be part of the scalar’s content. These 
+			*	additional lines are not subject to folding.
+			* 
+			*	Test case K858 covers a lot of this.
+			*/
+
 			// Line breaks in 'input' are assumed to have already been normalized.  That is, only \n will appear, no \r.
 			if (Style == Keep) return input;
 
 			int last_content = (int)input.length() - 1;
-			for (int ii = (int)input.length() - 1; ii >= 0; ii--)
+			int ii = (int)input.length() - 1;
+			for (; ii >= 0; ii--)
 			{
 				if (input[ii] == '\n') continue;
 				last_content = ii;
 				break;
 			}
-			if (last_content <= 0) return input;
+			// ii of -1 will occur if the input is entirely linefeeds (or otherwise an empty string).
+			//if (last_content <= 0) return input;			
 
 			switch (Style)
 			{
-			case Strip: return input.substr(0, last_content+1);
+			case Strip: 
+				if (ii < 0) return "";
+				return input.substr(0, last_content+1);
 			case Clip: 
+				if (ii < 0) return "";
 				if (last_content < input.length() - 1) return input.substr(0, last_content+1) + "\n";
 				else return input;			
 			default: throw NotSupportedException("Unrecognized chomping style in YAML parsing.");
@@ -288,6 +327,41 @@ namespace wb
 			return true;
 		}
 
+		inline bool YamlEventParser::AdvanceLineUpTo(int UpToIndent, string& excess)
+		{
+			CurrentIndent = 0;
+			excess.clear();
+
+			// First advance over one line break (which might be 2 characters if normalization is needed).
+
+			if (Current == '\n')
+			{
+				if (!Advance()) return false;
+				if (Current == '\r') {
+					if (!Advance()) return false;
+				}
+			}
+			else if (Current == '\r')
+			{
+				if (!Advance()) return false;
+				if (Current == '\n') {
+					if (!Advance()) return false;
+				}
+			}
+			else throw Exception("Expected a linebreak character to be the current character at AdvanceLineUpTo() call.");
+
+			// Next, count the current indent.
+			// Note that there may be no indent if the line break was followed by another line break immediately.
+			
+			while (Current == ' ' || Current == '\t')
+			{
+				if (CurrentIndent >= UpToIndent) excess += Current;
+				CurrentIndent++;
+				if (!Advance()) return false;
+			}
+			return true;
+		}
+
 		inline string YamlEventParser::ParseScalarContentLiteral()
 		{
 			bool Fold = (Current == '>');
@@ -334,7 +408,10 @@ namespace wb
 			*/			
 			if (strExplicitIndentation.length() > 0) ExplicitIndentation = Int32_Parse(strExplicitIndentation, wb::NumberStyles::Integer) + BlockIndent;
 			if (strExplicitIndentation.length() > 0) throw NotSupportedException("This Yaml parser does not support explicit indentation in a literal header, as found at " + GetSource() + ".");
-			if (!AdvanceLine()) return "";
+			if (!AdvanceLine()) {
+				if (ChompStyle == Keep) return "\n";
+				return "";
+			}
 			
 			// YAML 1.2.2 spec, section 8.1.1.1: "If no indentation indicator is given, then the content indentation level is equal to the number of leading spaces on the 
 			// first non-empty line of the contents. If there is no non-empty line then the content indentation level is equal to the number of spaces on the longest line."
@@ -348,13 +425,21 @@ namespace wb
 			string ret;						
 
 			int LongestEmptyIndent = 0;
+			string ExcessWhitespace;
 			while (IsLinebreak(Current))
 			{
 				//if (CurrentIndent > Indentation && ExplicitIndentation < 0) Indentation = CurrentIndent;
 				if (CurrentIndent > LongestEmptyIndent) LongestEmptyIndent = CurrentIndent;
 				// This is an empty line.
 				ret += '\n';			// Fold does not apply to an empty line.
-				if (!AdvanceLine()) return Chomp(ret, ChompStyle);
+				if (Indentation >= 0)
+				{
+					if (!AdvanceLineUpTo(Indentation, ExcessWhitespace)) return Chomp(ret, ChompStyle);
+				}
+				else
+				{
+					if (!AdvanceLine()) return Chomp(ret, ChompStyle);
+				}
 			}
 
 			/** Parse non-empty line(s) **/
@@ -363,7 +448,7 @@ namespace wb
 				
 			// There may not have been any empty lines, in which case we may need to
 			// set the indentation now with this line.
-			if (Indentation < 0) Indentation = CurrentIndent;
+			if (Indentation < 0) Indentation = max(CurrentIndent, BlockIndent);
 
 			// Is this line part of the literal block?
 			if (CurrentIndent < Indentation) {
@@ -378,25 +463,42 @@ namespace wb
 			// If it is further indented relative to the detected or explicit indentation, then it contains whitespace that must be
 			// preserved.
 			string FoldsPending = "";			// '-' for a pending fold or 'n' for an empty line.  Queued left-to-right, i.e. "-n-" came from "foo\n\nbar\n".
-			bool MoreIndented = (CurrentIndent > Indentation);
+			bool MoreIndented = ExcessWhitespace.length() > 0;
+			bool SurroundingMoreIndented = MoreIndented;
 
 			/** Parse additional lines until indentation breaks us out or until end-of-stream **/
 			
 			for (;;)
 			{
-				MoreIndented = (CurrentIndent > Indentation);
+				// See example 9.5 / test case W4TN:
+				if (Need(3) && Current == '.' && pNext[0] == '.' && pNext[1] == '.') break;
+
+				MoreIndented = ExcessWhitespace.length() > 0;
 				if (MoreIndented)
 				{
 					// When we hit a more indented line, any \n's that might have been folded need to be retained instead.
+					// Example 6.7: "In addition, folding does not apply to line breaks surrounding text lines that contain 
+					// leading white space. Note that such a more-indented line may consist only of such leading white space."
 					ret += string(FoldsPending.length(), '\n');
 					FoldsPending.clear();
-				}
-				for (int Additional = 0; Additional < (CurrentIndent - Indentation); Additional++) ret += ' ';
+					SurroundingMoreIndented = true;
+					ret += ExcessWhitespace;
+				}				
 
 				if (IsLinebreak(Current))
 				{
 					FoldsPending += 'n';		// Record an empty line in the pending list.
-					if (!AdvanceLine()) break;
+
+					// Test case MJS9: tabs count as indent (I think), but also need to be retained after reaching the indent level.
+					// 
+					// It would be nice to use AdvanceLine() here, however there are some differences in how spaces and tabs are handled
+					// compared to the usual.  Tabs need to count as indent, but also once we reach the Indentation level we need to
+					// retain spaces and tabs so that they can be added to the result.
+					// 
+					// AdvanceLineUpTo() returns false if we hit EOS and otherwise returns true.  It may or may not have reached
+					// "Indentation" indentation, and the CurrentIndent marker can check that, but if it exceeded "Indentation"
+					// indentation, those whitespace characters are retained in ExcessWhitespace.
+					if (!AdvanceLineUpTo(Indentation, ExcessWhitespace)) break;
 				}
 				else
 				{
@@ -408,6 +510,8 @@ namespace wb
 
 					// We've hit content at the same indentation level.  Any pending folds can now be
 					// applied as planned.
+					if (Fold && SurroundingMoreIndented) string_ReplaceAll(FoldsPending, "-", "n");		// See test suite 'MJS9'.
+					SurroundingMoreIndented = false;
 					string_ReplaceAll(FoldsPending, "-n", "n");			// See test suite '4Q9F'.
 					for (auto ii = 0; ii < FoldsPending.length(); ii++)
 					{
@@ -416,23 +520,44 @@ namespace wb
 					}
 					FoldsPending.clear();
 
+					bool EOS = false;
 					while (!IsLinebreak(Current)) { 
 						ret += Current; 
-						if (!Advance()) break;
+						if (!Advance()) { EOS = true; break; }
 					}
+					if (EOS) break;
 					if (Fold && !MoreIndented)
 					{
 						// Convert line breaks into whitespace, except if an empty line follows...
-						if (!AdvanceLine()) { 
+						if (!AdvanceLineUpTo(Indentation, ExcessWhitespace)) { 
+							/*
+							MoreIndented = ExcessWhitespace.length() > 0;
+							if (MoreIndented)
+							{
+								ret += string(FoldsPending.length(), '\n');
+								FoldsPending.clear();
+								ret += ExcessWhitespace;
+							}
+							*/
 							FoldsPending += 'n';			// Example 8.12: The final line break and trailing empty lines if any, are subject to chomping and are never folded.
 							break;
 						}
 						FoldsPending += '-';
 					}
 					else
-					{						
+					{	
 						FoldsPending += 'n';				// Although in this style a '\n' is appended, we use FoldsPending to manage chomping on the end.
-						if (!AdvanceLine()) break;
+						if (!AdvanceLineUpTo(Indentation, ExcessWhitespace)) {
+							MoreIndented = ExcessWhitespace.length() > 0;
+							if (MoreIndented)
+							{
+								ret += string(FoldsPending.length(), '\n');
+								FoldsPending.clear();
+								ret += ExcessWhitespace;
+							}
+							if (CurrentIndent > 0) FoldsPending += 'n';		// Test case L24T\01.  I believe this is because the last line had whitespace so is an empty line.
+							break;
+						}						
 					}
 				}
 			}
@@ -445,7 +570,22 @@ namespace wb
 			}
 			return ret;
 			//return Chomp(ret, ChompStyle);
-		}		
+		}
+
+		/*static*/ inline string YamlEventParser::TrimStartUnlessEscaped(const string& s) {
+			int count = 0;
+			while (s[count] == ' ' || s[count] == '\t' || s[count] == '\n') count++;
+			return s.substr(count);
+		}
+
+		/*static*/ inline string YamlEventParser::TrimEndUnlessEscaped(const string& s) {
+			size_t index = s.length() - 1;
+			while (index < s.length() && (s[index] == ' ' || s[index] == '\t' || s[index] == '\n')) index--;
+			if (index < s.length() && s[index] == '\\') index++;
+			return s.substr(0, index + 1);
+		}
+
+		/*static*/ inline string YamlEventParser::TrimUnlessEscaped(const string& s) { return TrimStartUnlessEscaped(TrimEndUnlessEscaped(s)); }
 
 		/*static*/ inline string YamlEventParser::ApplyFlowFolding(string input)
 		{
@@ -459,6 +599,8 @@ namespace wb
 
 			// Precondition: when in quotes, ParseScalarContent() captures the linebreaks as a single \n character and does not apply folding until
 			// close of the quotations, at which time ApplyFlowFolding is called to discard spaces and fold.
+
+			// Exception to the rule: test case DE56\02 illustrates that escaped spaces and tabs are to be preserved.
 			
 			string ret;
 			bool FoldPending = false;			
@@ -466,14 +608,16 @@ namespace wb
 			bool FirstLine = true;
 			for (;;)
 			{
-				auto next_linefeed = input.find('\n', ii);
+				// Don't need to worry about escaped newlines here as they'll have already been removed before calling.
+				auto next_linefeed = input.find('\n', ii);				
 				string next_line = input.substr(ii, next_linefeed - ii);
 
 				// next_line contains all text on the next line (or is an empty string for an empty line), but excludes the \n itself.
 				// Note: the first and last line are never empty- they contain the quotation marks.  Therefore the trimming must be adjusted.
-				if (FirstLine) next_line = TrimEnd(next_line);
-				else if (next_linefeed == string::npos) next_line = TrimStart(next_line);
-				else next_line = Trim(next_line);
+				bool LastLine = next_linefeed == string::npos;
+				if (FirstLine && !LastLine) next_line = TrimEndUnlessEscaped(next_line);
+				else if (LastLine && !FirstLine) next_line = TrimStartUnlessEscaped(next_line);
+				else if (!FirstLine && !LastLine) next_line = TrimUnlessEscaped(next_line);
 
 				if (next_linefeed == string::npos) {					
 					if (FoldPending) ret += ' ';
@@ -521,6 +665,8 @@ namespace wb
 					case 'v': ret += '\v'; break;
 					case 'f': ret += '\f'; break;
 					case 'r': ret += '\r'; break;
+					case ' ': ret += ' '; break;
+					case '\t': ret += '\t'; break;
 					case 'x': throw NotImplementedException("Escaped unicode sequences are not implemented in this YAML parser at " + Source + ".");
 						// The quotation character unescape is handled while parsing and should not be handled again here.					
 					case '/': ret += '/'; break;
@@ -811,7 +957,9 @@ namespace wb
 					if (ret.empty()) throw Exception("Unable to parse scalar content at " + GetSource() + ": end indicator (---) found.");		// Should have been detected & handled at higher-level.
 					return ReducePlainScalar(ret);
 				}
-				if (Current == '-' && (ret.empty() || ret[ret.length()-1] == ' ' || ret[ret.length()-1] == '\t' || ret[ret.length()-1] == '\n'))
+
+				// EmptyLine added here as per test case P76L.
+				if (EmptyLine && Current == '-' && (ret.empty() || ret[ret.length()-1] == ' ' || ret[ret.length()-1] == '\t' || ret[ret.length()-1] == '\n'))
 				{
 					if (Need(2) && (pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
 					{
@@ -846,11 +994,7 @@ namespace wb
 					bool Qualified = true;
 					for (int ii = 2; ii < GetMaxLoading(); ii++)
 					{
-						if (!Need(ii))
-						{							
-							Qualified = false;
-							break;
-						}
+						if (!Need(ii)) break;
 						if (pNext[ii - 2] == ' ' || pNext[ii - 2] == '\t' || IsLinebreak(pNext[ii - 2])) { Qualified = true; break; }
 						if (pNext[ii - 2] == '+' || pNext[ii - 2] == '-' || (pNext[ii - 2] >= '0' && pNext[ii - 2] <= '9')) continue;
 						Qualified = false;
@@ -936,7 +1080,7 @@ namespace wb
 			// I believe that the tags listing has to terminate with a !, though I'm not sure that's a strict rule.
 			auto close = shorthand.find('!');
 			string match_prefix = "";
-			if (close != string::npos && close > 0)
+			if (close != string::npos)
 			{
 				match_prefix = shorthand.substr(0, close + 1);
 				auto it = Tags.find("!" + match_prefix);
@@ -947,7 +1091,9 @@ namespace wb
 				}
 			}			
 
-			// Handle the case such as "!!foo", which here shows up as just one !:
+			// Handle the case such as "!!foo", which here shows up as just one !.
+			// But, note that "!!" can also be redefined and that case should be
+			// caught above.
 			if (shorthand.length() > 1 && shorthand[0] == '!')
 			{
 				return DecodeTag("<tag:yaml.org,2002:" + shorthand.substr(1) + ">");
@@ -1017,6 +1163,8 @@ namespace wb
 					string handle;
 					while (Current != ' ' && Current != '\t' && !IsLinebreak(Current))
 					{
+						if (CurrentStyle == Styles::FlowMapping && (Current == ',' || Current == '}')) break;
+						if (CurrentStyle == Styles::FlowSequence && (Current == ',' || Current == ']')) break;
 						handle += Current;
 						if (!Advance())
 						{
@@ -1205,10 +1353,6 @@ namespace wb
 			string Text = ParseScalarContent(CurrentBlockIndent, Flags, WasLinebreak, IgnoreColon);
 			if (Flags == NoFlags) Text = Trim(Text);		// NoFlags = "plain" in this case.
 
-bool hit = false;
-if (Text == "empty")
-	hit = true;
-
 			OnValueEvent(Text, Flags);
 		}
 
@@ -1358,6 +1502,30 @@ if (Text == "empty")
 			*	 - sequence entry
 			* 
 			*	Parses as +SEQ, =VAL :single multiline - sequence entry.
+			* 
+			*	Test case 'M6YH' (truncated):
+			* 
+			*	-
+			*    foo: bar
+			*   -
+			*    - 42
+			* 
+			*	The transition from the foo: bar mapping back to the containing sequence is a bit tricky.  "foo:" starts a block mapping with
+			*	indent 1, which is the same indent as the top-level sequence.  The colon adds indent +1, and so when we reach the third 
+			*	line (2nd dash) we can see that "bar" ends the value for the key-value pair.  However, then we are done with the colon value
+			*	where indent was +1'd and back to the "foo: bar" block mapping at an indent of 1.  It is normal for a mapping at an indent of
+			*	1 to have another key-value pair following it at an indent of 1, and that would need to be implicitly attached to the ongoing
+			*	mapping.  So a special rule is needed here is to consider the transition of mapping to sequence where the sequence is at the 
+			*	same indent (sibling level) as not a continuation of the mapping.
+			* 
+			*	Test case 'RR7F':
+			* 
+			*	a: 4.2
+			*	? d
+			*	: 23
+			* 
+			*	This case is to be parsed as {"a": 4.2, "d": 23}.  It illustrates that the +1 rule of dashes for readability does not apply
+			*	the same to explicit mappings.  
 			*/
 
 			/** AtIndent should correspond to where the block's indent actually is.  Some examples:
@@ -1409,14 +1577,14 @@ if (Text == "empty")
 			* 
 			*	Summarizing the rules:
 			*	 -	AtIndent shall always refer to the effective column position (0-indexed) of the character starting the block.  That is, AtIndent 
-			*		shall match the start position of a "key: value", but would be +1 from the actual column of a dash or ? character.
+			*		shall match the start position of a "key: value", but would be +1 from the actual column of a dash character.  For question mark,
+			*		ATIndent matches the question mark so that the indent level matches key: value pairs.
 			*	 -  Blocks within a sequence will begin with an indent +1 from the dash.
 			*	 -	Blocks after a colon will begin with an indent +1 relative to the key: block's indent.
-			*	 -  When testing for indent level on top of a dash or ? character, add plus one to current indent.
+			*	 -  When testing for indent level on top of a dash character, add plus one to current indent.
 			* 
 			*	 -  ParseUnknownBlock() calls ParseNode(BlockSequence) with the AtIndent being assigned as the effective indent not current, even
 			*		though the "-" has not been advanced over yet.  ParseNode() must use the effective to match, so it also +1's before advancing.
-			*	 -  Same indentation rules for ? as for - should apply I believe, as the ? will be perceived as indent the same way - is.
 			*/			
 
 			for (;;)
@@ -1471,16 +1639,17 @@ if (Text == "empty")
 							continue;
 						}
 						else
-						{
-							// Block mappings have a different indentation metric than block sequences do, so if we hit a - with an equal
-							// indent to the mapping *after* the dash itself has been accounted for (as this calculation has done), then the dash 
-							// is actually to the left of the mapping.  Consider test case '6BCT':
-							/*
-							*	- foo:	 bar
-							*	- - baz
-							*	  - baz
+						{							
+							/** Block mappings have a different indentation metric than block sequences do, so if we hit a - with an equal
+							*	indent to the mapping, then the dash is actually to the left of the mapping.  This is a special case of
+							*	transition from mapping -> parent block sequence.  Consider test case 'M6YH' (truncated):
+							* 
+							*	-
+							*	 foo: bar
+							*	-
+							*	 - 42
 							*/
-							//if (InStyle == Styles::BlockMapping) return;
+							if (InStyle == Styles::BlockMapping) return;
 
 							// We're at a sibling node/level and should continue/append to the block sequence as-is.
 							Advance(); CurrentIndent++;
@@ -1490,12 +1659,12 @@ if (Text == "empty")
 					}
 					else if (Current == '?' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
 					{
-						if (CurrentIndent + 1 < AtIndent)
+						if (CurrentIndent < AtIndent)
 						{
 							// Note: we do not advance in this case, caller must reduce CurrentBlockIndent to proceed.							
 							return;
 						}
-						else if (CurrentIndent + 1 > AtIndent)
+						else if (CurrentIndent > AtIndent)
 						{							
 							OnOpenEvent(Event::Map, false);
 							ParseExplicitBlockMapping();
@@ -1504,6 +1673,13 @@ if (Text == "empty")
 						}
 						else
 						{
+							// Test case 'RR7F': transition from key: value to explicit mapping.
+							if (InStyle == Styles::BlockMapping)
+							{
+								ParseExplicitBlockMapping();
+								return;
+							}
+
 							// We're at a sibling node/level and should continue/append to the block mapping as-is.
 							Advance(); CurrentIndent++;
 							FindNextContent(true, true);
@@ -1546,43 +1722,8 @@ if (Text == "empty")
 						if (Current == ',') { Advance(); continue; }
 					}
 					continue;
-				}
+				}								
 
-				// Handle as a prefix- which indicates a null key.
-				if (Current == ':' && (CurrentStyle == Styles::FlowMapping || !Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
-				{
-					Advance();
-					OnNullValueEvent();						// Null key.
-					continue;
-				}
-				
-#if 0
-				if (InStyle != Styles::BlockMapping && InStyle != Styles::FlowMapping)				
-				{
-					// Check if what we're about to parse is part of a key:value pair.  If yes and we're not currently 
-					// parsing a mapping, then we have detected a mapping implicitly and need to initiate a mapping 
-					// before we parse the key.
-					if (ColonLookahead())
-					{
-						OnOpenEvent(Event::Map, false);												
-						// I'm a little unsure what the indent should be here.  We are perhaps starting a new block here,
-						// and it's a transition from whatever style we're in to a BlockMapping style.  Though in a flow
-						// style the indent isn't supposed to matter at all.  I may need a special case for that as there
-						// is an allowance for a flow within a sequence, but you wouldn't have a closing } to end it.
-						//if (InStyle == Styles::FlowSequence)
-							//ParseNode(Styles::BlockMapping, CurrentIndent);
-						//else
-						ParseNode(Styles::BlockMapping, CurrentIndent);
-						OnCloseEvent(Event::Map);
-						continue;
-					}
-				}
-#endif
-
-				//string StartSource = GetSource();
-				//bool WasPlain = false;
-				//bool WasLinebreak = false;
-				//string Text;
 				switch (InStyle)
 				{				
 				case Styles::BlockSequence:				
@@ -1590,10 +1731,36 @@ if (Text == "empty")
 					{
 						if (!AdvanceLine())
 						{
-							OnNullValueEvent();						// Null value.
+							// Test case LE5A: there was actually a linebreak after !!str, so it is not 
+							// a null and actually is an empty string.  The promotion of !!str to cover 
+							// the block that follows would ordinarily hit the part of ParseUnknownBlock 
+							// where it transfers to parsing an alias or scalar, where the block_anchor 
+							// and block_tag are restored to applying to just the value.  So we'll need 
+							// to emulate the same here.
+							if (anchor.length() == 0) anchor = block_anchor;
+							if (tag.length() == 0) tag = block_tag;
+							block_anchor = block_tag = string();
+							OnValueEvent(string());						// Not null, but empty string.
 							return;
 						}
-					
+
+						/** Handle special case illustrated in test case 'W42U' / Spec Example 8.15:
+						*	- # Empty
+						*	- |
+						*	 block node
+						*	- - one # Compact
+						*	  - two # sequence
+						*
+						*	The spec makes it pretty clear that the blocks all start at column 1- the whitespace after
+						*	the dashes.  I'm handling this with a special case because I can't find a general rule
+						*	that covers it.
+						*/
+						if (CurrentIndent + 1 <= AtIndent && Current == '-' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+						{
+							OnNullValueEvent();						// Null value.
+							break;
+						}
+
 						if (!ParseUnknownBlock(AtIndent, true))
 						{
 							OnNullValueEvent();						// Null value.
@@ -1614,7 +1781,13 @@ if (Text == "empty")
 
 				case Styles::BlockMapping:
 				{
-					ParseAliasOrScalar();
+					// Handle as a prefix- which indicates a null key.
+					if (Current == ':' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					{
+						Advance();
+						OnNullValueEvent();								// Null key.
+					}
+					else ParseAliasOrScalar();
 
 					// After the key but before the colon, find the colon if there is one.  Pay attention to whether
 					// we hit a linefeed, which would start a block.
@@ -1698,8 +1871,15 @@ if (Text == "empty")
 						Advance();
 						return;
 					}
-									
-					ParseAliasOrScalar();
+					
+					if (Current == ':')
+					{
+						// Replace the ParseAliasOrScalar() call with a null event, and don't advance.
+						OnNullValueEvent();						// Null key.						
+						// Without advancing, we'll enter into the post-fix handling the same as if
+						// a value was present, though it's been replaced.
+					}
+					else ParseAliasOrScalar();
 
 					if (!FindNextContent(false)) throw FormatException("Unterminated flow mapping at " + GetSource() + ".");
 
@@ -1728,8 +1908,10 @@ if (Text == "empty")
 						}
 						else
 							ParseAliasOrScalar(true);
+
+						if (!FindNextContent(false)) throw FormatException("Unterminated flow mapping at " + GetSource() + ".");
 					}
-					else //if (Current == '?' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					else
 					{
 						// Do not advance, but need a null value entry.
 						OnNullValueEvent();						// Null value.
@@ -1754,7 +1936,7 @@ if (Text == "empty")
 					bool KeyValuePair = false;
 
 					// See test case 'CT4Q'.
-					if (Current == '?' && (Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
+					if (Current == '?' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
 					{
 						Advance();
 						KeyValuePair = true;
@@ -1950,7 +2132,7 @@ if (Text == "empty")
 			}
 				
 			if (Current == '-' && (!Need(2) || pNext[0] == ' ' || pNext[0] == '\t' || IsLinebreak(pNext[0])))
-			{				
+			{
 				//OnOpenEvent(Event::Sequence, block_anchor, block_tag, false);
 				OnOpenEvent(Event::Sequence, false);
 				//Advance(); CurrentIndent++; IndentOffset--;
