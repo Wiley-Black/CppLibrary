@@ -6,6 +6,7 @@
 #define __wbStlMemory_h__
 
 #include <malloc.h>
+#include <memory>
 
 #ifdef EmulateSTL
 namespace std

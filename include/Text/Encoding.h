@@ -38,10 +38,8 @@ namespace wb
 		public:
 			virtual uint GetCodePage() const = 0;
 
-			static UTF8Encoding GetUTF8();
-			#if _MSC_VER >= 1900			// Requires Visual Studio 2015 for "magic statics", a C++11 feature.
+			static UTF8Encoding GetUTF8();			
 			static const Encoding& GetDefault();
-			#endif
 		};
 
 		class UTF8Encoding : public Encoding
@@ -53,20 +51,20 @@ namespace wb
 		/** Statics **/
 
 		inline /*static*/ UTF8Encoding Encoding::GetUTF8() { return UTF8Encoding(); }
-
-		#if _MSC_VER >= 1900			// Requires Visual Studio 2015 for "magic statics", a C++11 feature.
+		
 		inline /*static*/ const Encoding& Encoding::GetDefault()
 		{
+			#if !defined(_MSC_VER) || _MSC_VER >= 1900			// Requires Visual Studio 2015 for "magic statics", a C++11 feature.
 			static UTF8Encoding Default;
+			#else
+			UTF8Encoding Default;
+			#endif
 			return *(Encoding*)&Default;
 		}
-		// An alternative implementation would rely on the PrimaryModule mechanism to include a static copy in
-		// a single compilation unit.
-		#endif
 	}
 
-	/** Conversions **/
-
+	/** Conversions **/	
+	
 	inline string to_string(const string& str, const text::Encoding& ToEncoding = text::Encoding::GetDefault()) { return str; }
 	inline wstring to_wstring(const wstring& str, const text::Encoding& ToEncoding = text::Encoding::GetDefault()) { return str; }
 
@@ -145,8 +143,8 @@ namespace wb
 #endif
 }
 
-#endif	// __WBString_h__
+#endif	// __WBEncoding_h__
 
-//	End of String.h
+//	End of Encoding.h
 
 

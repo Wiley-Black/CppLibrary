@@ -99,6 +99,13 @@
 inline double log2(double n) { return log(n) / log((double)2.0); }
 #endif
 
+/** Disable "hint" keywords not supported by older compilers **/
+
+#if defined(_MSC_VER) && _MSC_VER < 1900		// Minimum Visual C++ 2015
+#define constexpr
+#define noexcept
+#endif
+
 /** unique_ptr helpers **/
 
 #include "../Foundation/STL/Memory.h"
