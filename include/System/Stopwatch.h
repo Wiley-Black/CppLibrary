@@ -40,7 +40,7 @@ namespace wb
 		Int64	Accumulated;		
 
 		#ifdef STOPWATCH_STATIC_INIT
-		// Implementation note: this class gets used across DLL boundaries, but the ct-util library is statically linked.  This leads to
+		// Implementation note: this class can be used across DLL boundaries and/or libraries that are statically linked.  This can lead to
 		// the possibility that different member calls will happen in different DLLs, and therefore the static variables will actually
 		// exist in duplicate.  This isn't much of an issue because the initialization can just be performed twice, but it makes it
 		// critical that any use of the static variables be preceded by a call to CheckInit() to ensure that the globals are initialized.

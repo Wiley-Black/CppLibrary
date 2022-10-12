@@ -155,7 +155,7 @@ public:
 			}
 
 			pSocket->Get(&_RxMsgLen, sizeof(UInt32));			
-			if (IsLittleEndian()) SwapEndian(_RxMsgLen);
+			if (IsLittleEndian()) _RxMsgLen = SwapEndian(_RxMsgLen);
 			_RxPrefixReceived = true;
 			if (_RxMsgLen >= _Buffer.GetCapacity()) throw FormatException("Received message prefix exceeds maximum length.");
 		}
@@ -164,7 +164,7 @@ public:
 		for (;;)
 		{
 			pSocket->Process();
-			uint Remaining = _RxMsgLen - _Buffer.GetLength();
+			UInt32 Remaining = _RxMsgLen - (UInt32)_Buffer.GetLength();
 			if (Remaining > 0)
 			{
 				uint Avail = pSocket->GetRxCount();

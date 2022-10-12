@@ -418,6 +418,7 @@ namespace wb
 							CurrentKey += Current;
 							Advance();
 						}
+						if (CurrentState == State::ParsingAttributeKey) return nullptr;
 						continue;
 
 					case State::ParsingAttributeValueStart:
@@ -452,6 +453,7 @@ namespace wb
 
 							throw FormatException("Expected > to follow closing / of tag at " + GetSource() + ".");
 						}
+						if (CurrentState == State::ParsingOpenCloseTagCompletion) return nullptr;
 						continue;
 
 					case State::ParsingClosingTag:
