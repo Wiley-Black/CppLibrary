@@ -7,5 +7,6 @@
 
 #include "Image Processing/Images.h"
 #include "Image Processing/ImageFFT.h"
+#include "Image Processing/ImageStacks.h"
 
 #endif // __wbComplete__

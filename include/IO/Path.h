@@ -234,6 +234,8 @@ namespace wb
 			static Path GetTempFileName();
 			#endif			
 		
+			bool Exists();
+
 			inline static bool HasTrailingSeparator(string path)
 			{				
 				return (path.length() > 0 && path[path.length() - 1] == DirectorySeparatorChar);
@@ -313,6 +315,11 @@ namespace wb { namespace io {
 		using namespace std;
 
 		/** Implementation - Path **/		
+
+		inline bool Path::Exists()
+		{
+			return wb::io::File::Exists(m_str);
+		}
 
 		inline bool Path::IsAbsolutePath()
 		{

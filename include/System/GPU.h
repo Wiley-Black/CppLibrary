@@ -14,6 +14,10 @@
 #include <driver_types.h>			// For cudaError_t.
 #include <cuda_runtime_api.h>		// For cudaGetErrorString().
 
+#if (CUDART_VERSION >= 12000)			// CUDA 12+
+#include <cuComplex.h>
+#endif
+
 	// Note: I think the following is unnecessary for CUDA 11.2, but seems to be needed for CUDA 10.2.  It is harmless for CUDA 11.2 so included in all cases.
 #pragma comment(lib, "cuda.lib")	// Force linkage to cuda.lib to get access to driver API, i.e. cuGetErrorString() and cuCtxGetDevice().
 #pragma comment(lib, "cudart.lib")
@@ -527,6 +531,7 @@ namespace wb
 			{			
 				cudaStream_t						stream;
 				int									device;
+				bool								responsible;
 				cudaDeviceProp						properties;
 
 				/// <summary>
@@ -537,7 +542,7 @@ namespace wb
 				/// </summary>
 				vector<memory::DeviceScratchBuffer>	scratch;
 
-				GPUStreamData(cudaStream_t fromStream = nullptr) : stream(fromStream)
+				GPUStreamData(cudaStream_t fromStream = nullptr, bool responsible_ = true) : stream(fromStream), responsible(responsible_)
 				{
 					if (stream == nullptr)
 					{
@@ -566,7 +571,8 @@ namespace wb
 				{
 					if (stream != nullptr)
 					{
-						cudaThrowable(cudaStreamDestroy(stream));
+						if (responsible)
+							cudaThrowable(cudaStreamDestroy(stream));
 						stream = nullptr;
 					}
 				}
@@ -592,6 +598,18 @@ namespace wb
 					nvtx::SetName(stream, sDiagnosticName.c_str());
 				#endif
 				ret.m_pData = make_shared<GPUStreamData>(stream);
+				return ret;
+			}
+
+			static GPUStream Existing(std::shared_ptr<GPUSystemInfo>& pGSI, cudaStream_t from_stream, const string& sDiagnosticName = "")
+			{
+				GPUStream ret;
+				ret.m_pGSI = pGSI;								
+#ifdef NVTX_Enable
+				if (!sDiagnosticName.empty())
+					nvtx::SetName(from_stream, sDiagnosticName.c_str());
+#endif
+				ret.m_pData = make_shared<GPUStreamData>(from_stream, false);
 				return ret;
 			}
 

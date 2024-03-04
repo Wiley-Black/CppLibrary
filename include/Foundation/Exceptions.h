@@ -198,7 +198,7 @@ namespace wb
 			char ret[20]; sprintf_s(ret, sizeof(ret), "%X", LastError);
 			throw Exception(("System error 0x" + std::string(ret) + ", unable to retrieve detailed error information.").c_str());
 		}
-		osstring os_msg = pszBuffer;
+		osstring os_msg = to_osstring(pszBuffer);
 		::LocalFree(pszBuffer);
 		std::string msg = wb::to_string(os_msg);
 

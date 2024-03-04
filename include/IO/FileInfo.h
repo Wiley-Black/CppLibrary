@@ -125,7 +125,7 @@ namespace wb
 
 		inline osstring FileInfo::GetName() const { return Path::GetFileName(FullName); }
 		inline osstring FileInfo::GetExtension() const { return Path::GetExtension(FullName); }
-		inline bool FileInfo::Exists() const { return File::Exists(FullName); }
+		inline bool FileInfo::Exists() const { return File::Exists(FullName.to_osstring()); }
 
 		/** Implementation - DirectoryInfo **/
 

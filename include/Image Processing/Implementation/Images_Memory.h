@@ -65,6 +65,7 @@ namespace wb
 		#pragma endregion
 
 		#pragma region "FreeImage compatibility"
+		#ifdef FreeImage_Support
 		namespace FI
 		{
 			template<typename PixelType> struct Behaviors
@@ -130,6 +131,7 @@ namespace wb
 				throw IOException(ret);
 			}
 		}
+		#endif
 		#pragma endregion
 
 		#pragma region "Image Memory Management"								

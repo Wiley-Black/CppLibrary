@@ -847,6 +847,9 @@ namespace wb
 			PixelType* GetHostScanlinePtr(int yy) { Synchronize(); return (PixelType*)(((byte*)m_HostData.m_pData) + yy * m_HostData.m_Stride); }
 			const PixelType* GetHostScanlinePtr(int yy) const { Synchronize(); return (const PixelType*)(((byte*)m_HostData.m_pData) + yy * m_HostData.m_Stride); }
 			
+			int GetHostDataStride() const { return m_HostData.m_Stride; }
+			int GetDeviceDataStride() const { return m_DeviceData.m_Stride; }
+
 			PixelType& operator() (int xx, int yy) { ToHost(); Synchronize(); return *(PixelType*)(((byte*)m_HostData.m_pData) + xx * sizeof(PixelType) + yy * m_HostData.m_Stride); }
 			const PixelType& operator() (int xx, int yy) const {
 				if (!IsReadableOnHost()) throw NotSupportedException("Image must be readable on the host before calling const operator().");

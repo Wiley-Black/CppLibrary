@@ -33,12 +33,12 @@ namespace wb
 		{
 		public:
 
-			static bool Exists(const char* pszPath)
+			static bool Exists(const osstring& strPath)
 			{
 				#ifdef _WINDOWS
 
 				WIN32_FIND_DATA FindData;
-				HANDLE hSearch = FindFirstFile(to_osstring(pszPath).c_str(), &FindData);
+				HANDLE hSearch = FindFirstFile(strPath.c_str(), &FindData);
 				if (hSearch == INVALID_HANDLE_VALUE)
 				{
 					DWORD LastError = GetLastError();
@@ -51,7 +51,7 @@ namespace wb
 				#else
 
 				struct stat buffer;
-				int status = stat(pszPath, &buffer);
+				int status = stat(strPath.c_str(), &buffer);
 				if (status == 0) return true;
 				// Verified that errno = ENOENT under Ubuntu when the file doesn't exist.  I didn't verify that
 				// the directory being missing causes ENOTDIR, but it seems reasonable from the description.
@@ -60,14 +60,14 @@ namespace wb
 				if (errno != ENOENT && errno != ENOTDIR)
 				{
 					try { Exception::ThrowFromErrno(errno); }
-					catch (std::exception& ex) { throw IOException("Unable to check existance of file '" + string(pszPath) + "':" + string(ex.what())); }
+					catch (std::exception& ex) { throw IOException("Unable to check existance of file '" + strPath + "':" + string(ex.what())); }
 				}
 				return false;
 
 				#endif
 			}
 
-			static bool Exists(const string& sPath) { return Exists(sPath.c_str()); }
+			static bool Exists(const string& sPath) { return Exists(to_osstring(sPath)); }
 
 			static void Delete(const string& sPath)
 			{
