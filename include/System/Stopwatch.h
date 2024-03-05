@@ -92,8 +92,9 @@ namespace wb
 
 		TimeSpan	GetElapsed() const;
 		double		GetElapsedMilliseconds() const;
-		Int64		GetElapsedNanoseconds() const;
 		double		GetElapsedSeconds() const;
+
+		//Int64		GetElapsedNanoseconds() const;
 
 		std::string ToString(int Precision = 9) const;		
 	};
@@ -218,6 +219,7 @@ namespace wb
 		Start();
 	}
 
+#if 0	// GetElapsedNanoseconds() can rollover after something like 30 minutes... 
 	inline Int64 Stopwatch::GetElapsedNanoseconds() const
 	{
 		CheckInit();
@@ -236,10 +238,26 @@ namespace wb
 		if (CountsPerSecond <= 0) throw NotSupportedException("Stopwatch initialization failed.");		// Prevent a divide by zero fault.
 		return (Elapsed * 1000000000ll) / CountsPerSecond;
 	}
+#endif
 
-	inline TimeSpan Stopwatch::GetElapsed() const {	return TimeSpan::FromNanoseconds(GetElapsedNanoseconds()); }	
-	inline double Stopwatch::GetElapsedMilliseconds() const { return (double)GetElapsedNanoseconds() / 1000000.0; }
-	inline double Stopwatch::GetElapsedSeconds() const { return (double)GetElapsedNanoseconds() / 1000000000.0; }
+	inline double Stopwatch::GetElapsedMilliseconds() const
+	{
+		CheckInit();
+
+		// The Stopwatch may have been Start()-Stop()'d multiple times without being Reset().  Each time Stop() is called, the period is 
+		// added to Accumulated, so Accumulated is what we want to represent as the overall elapsed time.  It's also possible that the
+		// stopwatch is still running as GetElapsedNanoseconds() is called.  Stop() may have never been called.  We can handle this by
+		// adding the current period on top of Accumulated.
+		Int64 Elapsed = Accumulated;
+		if (Running) Elapsed += (CountsSinceEpoch() - StartTime);		
+
+		// Careful to multiply first to avoid losing precision.
+		if (CountsPerSecond <= 0) throw NotSupportedException("Stopwatch initialization failed.");		// Prevent a divide by zero fault.
+		return ((double)Elapsed * 1000.0) / (double)CountsPerSecond;
+	}
+
+	inline TimeSpan Stopwatch::GetElapsed() const {	return TimeSpan::FromSeconds(GetElapsedSeconds()); }
+	inline double Stopwatch::GetElapsedSeconds() const { return (double)GetElapsedMilliseconds() / 1000.0; }
 
 	inline std::string Stopwatch::ToString(int Precision /*= 9*/) const
 	{

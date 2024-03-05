@@ -32,15 +32,15 @@ namespace wb
 
 			static ImageStack<PixelType> Load(const osstring& filename, GPUStream Stream = GPUStream::None())
 			{
+				auto ret = ImageStack<PixelType>();
 				FreeImage_SetOutputMessage(FI::ErrorHandler);
 				FREE_IMAGE_FORMAT fif = FI::GetFormat(wb::io::Path::GetExtension(wb::to_string(filename)));
 				//FILE* pFile = _tfopen(filename, "rb");
 				//auto pMB = FreeImage_OpenMultiBitmapFromHandle(fif, &io, (fi_handle)pFile, flags);
-				auto pMB = FreeImage_OpenMultiBitmap(fif, wb::to_string(filename).c_str(), false, true, true);
+				auto pMB = FreeImage_OpenMultiBitmap(fif, wb::to_string(filename).c_str(), false, true, false);
 				try
 				{
-					int count = FreeImage_GetPageCount(pMB);					
-					auto ret = ImageStack<PixelType>();
+					int count = FreeImage_GetPageCount(pMB);										
 					for (int ii = 0; ii < count; ii++)
 					{
 						auto pFIB = FreeImage_LockPage(pMB, ii);
@@ -61,8 +61,7 @@ namespace wb
 							throw;
 						}
 						FreeImage_UnlockPage(pMB, pFIB, FALSE);
-					}
-					return ret;
+					}					
 				}
 				catch(...)
 				{
@@ -70,6 +69,7 @@ namespace wb
 					throw;
 				}
 				FreeImage_CloseMultiBitmap(pMB, 0);
+				return ret;
 			}
 
 			#endif		

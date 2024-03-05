@@ -338,9 +338,9 @@ namespace wb
 				/// <summary>
 				/// When using FreeImage, host memory that has no flags on will be allocated and freed by FreeImage.  
 				/// FreeImage uses the FIBITMAP structure as its data handle.  m_pData will be an alias to 
-				/// FreeImage_GetBits().  In cases where FreeImage is responsible for freeing the memory, 
+				/// FreeImage_GetBits().  In cases where FreeImage is responsible for freeing the image memory, 
 				/// m_Responsibility will be marked as "not responsible", but the presence of a non-NULL 
-				/// m_pFileData ensures responsibility for freeing the memory.  This follows the logic that
+				/// m_pFileData ensures responsibility for freeing the handle memory.  This follows the logic that
 				/// the m_Responsibility indicator is specifically with regards to m_pData, which in this case
 				/// we do not want to free directly.  We instead must free the m_pFileData anytime that it is
 				/// non-NULL and treat m_pData as just an alias.
@@ -450,6 +450,7 @@ namespace wb
 					ret.m_pData = FreeImage_GetBits(pFIB);
 					// See also notes on the m_pFileData member.
 					ret.m_Responsibility = DataResponsibility::RdWr;
+					ret.m_pFileData = pFIB;
 					return ret;
 				}
 				#endif
