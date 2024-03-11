@@ -303,6 +303,8 @@ namespace wb
 
 			/// <summary>Checks whether a given path or filename patches a wildcard pattern.  The characters ? and * are supported.</summary>
 			inline static bool IsWildcardMatch(string pattern, string path, bool CaseSensitive /*= true*/);		
+
+			inline void CreateDirectory(bool CreateParents = false, bool ExistsOk = true);
 		};
 	}
 }
@@ -582,6 +584,46 @@ namespace wb { namespace io {
 		inline /*static*/ Path Path::Join(Path path1, Path path2, Path path3, Path path4) { return Join(Join(path1,path2,path3),path4); }
 		inline /*static*/ Path Path::Join(Path path1, Path path2, Path path3, Path path4, Path path5) { return Join(Join(path1,path2,path3,path4),path5); }
 		inline /*static*/ Path Path::Join(Path path1, Path path2, Path path3, Path path4, Path path5, Path path6) { return Join(Join(path1,path2,path3,path4,path5),path6); }		
+
+		inline void Path::CreateDirectory(bool CreateParents /*= false*/, bool ExistsOk /*= true*/)
+		{
+			if (ExistsOk)
+			{
+				if (Directory::Exists(*this)) return;
+			}
+
+			if (CreateParents)
+			{
+				// Recursively create any parents that don't already exist...			
+				string Parent = GetDirectory();
+				if (Parent.length() >= 1)
+					if (!Path::IsRoot(Parent) && !Directory::Exists(Parent)) Path(Parent).CreateDirectory(CreateParents, true);
+			}
+
+			string Parent = GetDirectory();
+			if (!Directory::Exists(Parent))			
+				throw IOException("Unable to create directory '" + to_string() + "': parent directory does not exist.");			
+
+			// Now create this directory...
+			#ifdef _WINDOWS
+			if (::CreateDirectory(m_str.c_str(), nullptr) == 0)
+			{
+				DWORD dwError = GetLastError();
+				if (dwError == ERROR_ALREADY_EXISTS) return;
+				try {
+					Exception::ThrowFromWin32(dwError);
+				}
+				catch (std::exception& ex) { throw IOException("Unable to create directory '" + to_string() + "':" + string(ex.what())); }
+			}
+			#else
+			if (mkdir(Path::StripTrailingSeparator(m_str).c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
+			{
+				if (errno == EEXIST) return;
+				try { Exception::ThrowFromErrno(errno); }
+				catch (std::exception& ex) { throw IOException("Unable to create directory '" + strPath + "':" + string(ex.what())); }
+			}
+			#endif
+		}
 
 		inline std::string to_string(const Path& pth)
 		{
