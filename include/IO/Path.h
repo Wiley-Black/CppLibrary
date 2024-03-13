@@ -48,7 +48,7 @@ namespace wb
 			bool operator!() const { return m_str.length() == 0; }
 
 			// Path is a thin wrapper around wb::osstring, and can often be treated interchangably.
-			size_t length() { return m_str.length(); }
+			size_t length() const { return m_str.length(); }
 			wb::osstring substr(size_t pos = 0, size_t len = std::string::npos) const { return m_str.substr(pos, len); }
 			inline oschar& operator[] (size_t pos) { return m_str[pos]; }
 			inline const oschar& operator[] (size_t pos) const { return m_str[pos]; }
@@ -64,7 +64,7 @@ namespace wb
 				return ret;
 			}			
 
-			inline Path GetFileName()
+			inline Path GetFileName() const
 			{
 				if (length() < 1) return os("");
 				if (length() > Int32_MaxValue) throw ArgumentOutOfRangeException();
@@ -83,7 +83,7 @@ namespace wb
 			/// was a file extension.  A path without a dot as the last piece of the path will
 			/// return "".
 			/// </summary>
-			inline osstring GetExtension()
+			inline osstring GetExtension() const
 			{
 				if (length() < 1) return os("");
 				if (length() > Int32_MaxValue) throw ArgumentOutOfRangeException();
@@ -121,7 +121,7 @@ namespace wb
 				return "";
 			}
 			
-			inline osstring GetFileNameWithoutExtension()
+			inline osstring GetFileNameWithoutExtension() const
 			{
 				Path path = GetFileName();
 				if (path.length() < 1) return os("");
@@ -135,7 +135,14 @@ namespace wb
 
 			inline static osstring GetFileNameWithoutExtension(Path path) { return path.GetFileNameWithoutExtension(); }
 
-			inline Path GetDirectory()
+			inline Path WithExtension(const string& new_extension) const
+			{
+				string new_ext = new_extension;
+				if (new_ext.length() > 0 && new_ext[0] != '.') new_ext = string(".") + new_extension;
+				return GetDirectory() / (GetFileNameWithoutExtension() + wb::to_osstring(new_ext));
+			}
+
+			inline Path GetDirectory() const
 			{
 				if (m_str.length() < 1) return "";
 				if (m_str.length() > Int32_MaxValue) throw ArgumentOutOfRangeException();
@@ -236,6 +243,12 @@ namespace wb
 		
 			bool Exists();
 
+			/// <summary>
+			/// IsDirectory() returns true if the path references an existing directory.  If the path does not exist or the
+			/// path references a file and not a directory, then false is returned.
+			/// </summary>			
+			bool IsDirectory();
+
 			inline static bool HasTrailingSeparator(string path)
 			{				
 				return (path.length() > 0 && path[path.length() - 1] == DirectorySeparatorChar);
@@ -305,6 +318,8 @@ namespace wb
 			inline static bool IsWildcardMatch(string pattern, string path, bool CaseSensitive /*= true*/);		
 
 			inline void CreateDirectory(bool CreateParents = false, bool ExistsOk = true);
+
+			inline void Delete(bool ok_if_missing = false, bool recursive = false);
 		};
 	}
 }
@@ -321,6 +336,27 @@ namespace wb { namespace io {
 		inline bool Path::Exists()
 		{
 			return wb::io::File::Exists(m_str);
+		}
+
+		inline bool Path::IsDirectory()
+		{
+			#ifdef _WINDOWS
+			DWORD FileAttributes = GetFileAttributes(m_str.c_str());
+			if (FileAttributes == INVALID_FILE_ATTRIBUTES)
+			{
+				DWORD ErrCode = GetLastError();
+				// ERROR_BAD_NETPATH is returned if the path is a network share.  One could debate whether
+				// a network share is considered a directory, but since GetFileAttributes() doesn't, I won't
+				// here either.
+				if (ErrCode == ERROR_BAD_NETPATH) return false;
+				if (ErrCode == ERROR_FILE_NOT_FOUND || ErrCode == ERROR_PATH_NOT_FOUND) return false;
+				Exception::ThrowFromWin32(ErrCode);
+			}
+			return (FileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+			#else
+			struct stat sb;
+			return (stat(m_str.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode));
+			#endif
 		}
 
 		inline bool Path::IsAbsolutePath()
@@ -356,7 +392,7 @@ namespace wb { namespace io {
 					DWORD nResult = ::GetTempPath(nLength+1, pszBuffer);
 					if (nResult == 0) { delete[] pszBuffer; Exception::ThrowFromWin32(::GetLastError()); }
 					if (nResult > nLength+1) { delete[] pszBuffer; continue; }
-					string ret = wb::to_string(pszBuffer);
+					auto ret = wb::to_osstring(pszBuffer);
 					delete[] pszBuffer;
 					if (Directory::Exists(ret)) return ret;
 					Directory::CreateDirectory(ret);
@@ -595,12 +631,12 @@ namespace wb { namespace io {
 			if (CreateParents)
 			{
 				// Recursively create any parents that don't already exist...			
-				string Parent = GetDirectory();
+				auto Parent = GetDirectory();
 				if (Parent.length() >= 1)
 					if (!Path::IsRoot(Parent) && !Directory::Exists(Parent)) Path(Parent).CreateDirectory(CreateParents, true);
 			}
 
-			string Parent = GetDirectory();
+			auto Parent = GetDirectory();
 			if (!Directory::Exists(Parent))			
 				throw IOException("Unable to create directory '" + to_string() + "': parent directory does not exist.");			
 
@@ -623,6 +659,28 @@ namespace wb { namespace io {
 				catch (std::exception& ex) { throw IOException("Unable to create directory '" + strPath + "':" + string(ex.what())); }
 			}
 			#endif
+		}
+
+		inline void Path::Delete(bool ok_if_missing /*= false*/, bool recursive /*= false*/)
+		{
+			if (!IsDirectory())
+			{
+				if (!ok_if_missing)
+				{
+					if (!File::Exists(m_str))
+						throw FileNotFoundException();
+				}
+				File::Delete(m_str);
+			}
+			else
+			{
+				if (!ok_if_missing)
+				{
+					if (!Directory::Exists(m_str))
+						throw DirectoryNotFoundException();
+				}
+				Directory::Delete(m_str, recursive);
+			}
 		}
 
 		inline std::string to_string(const Path& pth)

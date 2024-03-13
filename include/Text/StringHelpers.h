@@ -175,6 +175,36 @@ namespace wb
 	/** Misc **/
 	inline bool isnumeric(char c) { return isdigit(c) || c == '+' || c == '-' || c == '.'; }
 
+	/** Replace **/
+
+	inline string Replace(const string& Value, const string& oldSubstr, const string& newSubstr)
+	{
+		string ret;
+		for (size_t ii = 0; ii < Value.size(); )
+		{
+			bool hit = true;
+			for (size_t jj = 0; jj < oldSubstr.size(); jj++)
+			{
+				if (Value[ii + jj] != oldSubstr[jj])
+				{
+					hit = false;
+					break;
+				}
+			}
+			if (hit)
+			{
+				ret += newSubstr;
+				ii += oldSubstr.size();
+			}
+			else
+			{
+				ret += Value[ii];
+				ii++;
+			}
+		}
+		return ret;
+	}
+
 	/** Simple Tokenizing **/
 
 	enum class StringSplitOptions

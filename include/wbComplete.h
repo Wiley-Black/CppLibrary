@@ -5,6 +5,7 @@
 
 #include "wbCore.h"
 
+#include "Processing/ThreadSafeQueue.h"
 #include "Image Processing/Images.h"
 #include "Image Processing/ImageFFT.h"
 #include "Image Processing/ImageStacks.h"

@@ -14,9 +14,11 @@
 #include <sys/stat.h>
 
 #if !defined(_WINDOWS)
+#define _XOPEN_SOURCE 500		// For nftw(), used by Directory::Remove().
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <ftw.h>
 #endif
 
 #include "DateTime/DateTime.h"
@@ -65,11 +67,9 @@ namespace wb
 				return false;
 
 				#endif
-			}
+			}			
 
-			static bool Exists(const string& sPath) { return Exists(to_osstring(sPath)); }
-
-			static void Delete(const string& sPath)
+			static void Delete(const osstring& sPath)
 			{
 				// From the .NET API for File.Delete(): If the file to be deleted does not exist, no exception is thrown.
 
@@ -114,9 +114,9 @@ namespace wb
 			}
 			#endif
 
-			inline static void WriteAllText(string path, string contents);
+			inline static void WriteAllText(osstring path, string contents);
 
-			inline static string ReadAllText(string path);
+			inline static string ReadAllText(osstring path);
 		};
 
 		class Directory
@@ -124,22 +124,27 @@ namespace wb
 		private:
 
 			/// <summary>Creates all parts of the requested path that don't already exist, but does not retrieve the DirectoryInfo.</summary>
-			static void CreateDirectoryNoEnum(const string& sPath);
+			static void CreateDirectoryNoEnum(const osstring& sPath);
 
-		public:
-			static bool Exists(const char* pszPath);
-			static bool Exists(const string& sPath) { return Exists(sPath.c_str()); }			
+		public:			
+			static bool Exists(const osstring& sPath);
 
 			/// <summary>Creates all parts of the requested path.  If parts of the path already exist, they are used and not created but the DirectoryInfo is still retrieved.</summary>
-			static DirectoryInfo CreateDirectory(const string& sPath);
+			static DirectoryInfo CreateDirectory(const osstring& sPath);
 
 			/// <summary>Changes to the requested directory.</summary>
 			static void SetCurrentDirectory(const char* pszPath);			
 
-			static void SetCurrentDirectory(string sPath) { SetCurrentDirectory(sPath.c_str()); }
+			static void SetCurrentDirectory(osstring sPath) { SetCurrentDirectory(sPath.c_str()); }
 
 			/// <summary>Retrieves the application's current working directory.</summary>
 			static string GetCurrentDirectory();
+			
+			/// <summary>
+			/// Deletes the specified directory.  If recursive is true, then also deletes subdirectories and files
+			/// in sPath.  If recursive is false and the directory is not empty, then an IOException is thrown.
+			/// </summary>		
+			static void Delete(const osstring& sPath, bool recursive = false);
 		};
 	}
 }
@@ -184,14 +189,14 @@ namespace wb
 			return LastWriteTime;
 		}
 
-		inline /*static*/ void File::WriteAllText(string path, string contents)
+		inline /*static*/ void File::WriteAllText(osstring path, string contents)
 		{
 			FileStream fs(path, FileMode::Create, FileAccess::ReadWrite);
 			wb::text::StringBuilder sb(contents);
 			fs.Write(sb.BaseAddress(), sb.GetLength());
 		}
 
-		inline /*static*/ string File::ReadAllText(string path)
+		inline /*static*/ string File::ReadAllText(osstring path)
 		{
 			FileInfo fi(path);
 			FileStream fs(path, FileMode::Open, FileAccess::Read);
@@ -213,12 +218,12 @@ namespace wb
 
 		/** Implementation - Directory **/
 
-		inline /*static*/ bool Directory::Exists(const char* pszPath)
+		inline /*static*/ bool Directory::Exists(const osstring& sPath)
 		{
 			#ifdef _WINDOWS
 
 			WIN32_FIND_DATA FindData;
-			HANDLE hSearch = FindFirstFile(Path::StripTrailingSeparator(Path(pszPath)).to_osstring().c_str(), &FindData);
+			HANDLE hSearch = FindFirstFile(Path::StripTrailingSeparator(Path(sPath)).to_osstring().c_str(), &FindData);
 			if (hSearch == INVALID_HANDLE_VALUE)
 			{
 				DWORD LastError = GetLastError();
@@ -231,7 +236,7 @@ namespace wb
 			#else
 
 			struct stat buffer;
-			return (stat(pszPath, &buffer) == 0 && S_ISDIR(buffer.st_mode));
+			return (stat(sPath.c_str(), &buffer) == 0 && S_ISDIR(buffer.st_mode));
 
 			#endif
 		}
@@ -273,23 +278,23 @@ namespace wb
 			#endif
 		}
 
-		inline /*static*/ void Directory::CreateDirectoryNoEnum(const string& strPath)
+		inline /*static*/ void Directory::CreateDirectoryNoEnum(const osstring& strPath)
 		{
 			// Recursively create any parents that don't already exist...			
-			string Parent = Path::GetDirectory(strPath);
+			osstring Parent = Path::GetDirectory(strPath);
 			if (Parent.length() >= 1)
 				if (!Path::IsRoot(Parent) && !Directory::Exists(Parent)) CreateDirectoryNoEnum(Parent);
 
 			// Now create this directory...
 			#ifdef _WINDOWS
-			if (::CreateDirectory(to_osstring(strPath).c_str(), nullptr) == 0)
+			if (::CreateDirectory(strPath.c_str(), nullptr) == 0)
 			{
 				DWORD dwError = GetLastError();
 				if (dwError == ERROR_ALREADY_EXISTS) return;
 				try { 										
 					Exception::ThrowFromWin32(dwError); 
 				}
-				catch (std::exception& ex) { throw IOException("Unable to create directory '" + strPath + "':" + string(ex.what())); }
+				catch (std::exception& ex) { throw IOException("Unable to create directory '" + to_string(strPath) + "':" + string(ex.what())); }
 			}
 			#else
 			if (mkdir(Path::StripTrailingSeparator(strPath).c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
@@ -301,7 +306,7 @@ namespace wb
 			#endif
 		}
 
-		inline /*static*/ DirectoryInfo Directory::CreateDirectory(const string& strPath)
+		inline /*static*/ DirectoryInfo Directory::CreateDirectory(const osstring& strPath)
 		{
 			CreateDirectoryNoEnum(strPath);
 			return DirectoryInfo(strPath);
@@ -321,6 +326,47 @@ namespace wb
 			if (status == 0) return;
 			try { Exception::ThrowFromErrno(errno); }
 			catch (std::exception& ex) { throw IOException("Unable to set current directory to path '" + string(pszPath) + "':" + string(ex.what())); }
+			#endif
+		}
+		
+		#ifndef _WINDOWS
+		int unlink_cb(const char* fpath, const struct stat* sb, int typeflag, struct FTW* ftwbuf)
+		{
+			return remove(fpath);						
+		}
+		#endif
+
+		inline /*static*/ void Directory::Delete(const osstring& sPath, bool recursive /*= false*/)
+		{
+			#ifdef _WINDOWS
+			if (!recursive)
+			{
+				BOOL result = ::RemoveDirectory(sPath.c_str());
+				if (result) return;
+				Exception::ThrowFromWin32(::GetLastError());
+			}
+
+			// This could probably be faster.  There is the IFileOperation API available in Win32, but it
+			// involves initializing COM and I wasn't sure I wanted to include that here.  There is SHFileOperation
+			// but Microsoft's documentation on it mentions some abiguity in error reporting.
+			auto di = DirectoryInfo(sPath);
+
+			auto subdirectories = di.EnumerateDirectories();
+			for (auto& subdir : subdirectories) Directory::Delete(subdir.GetFullName(), recursive);
+
+			auto files = di.EnumerateFiles();
+			for (auto& file : files) File::Delete(file.GetFullName());
+
+			#else
+			if (!recursive)
+			{
+				int result = rmdir(sPath.c_str());
+				if (result == 0) return;
+				Exception::ThrowFromErrno(errno);
+			}
+			int result = nftw(sPath.c_str(), unlink_cb, 64, FTW_DEPTH | FTW_PHYS);
+			if (result == 0) return;
+			Exception::ThrowFromErrno(errno);
 			#endif
 		}
 	}

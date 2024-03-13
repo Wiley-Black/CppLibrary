@@ -19,7 +19,7 @@ namespace wb
 		/// StreamWriter, similar to the C# class.  Presently provides only a "pass-thru" encoding, whereas a proper implementation
 		/// will give the encoding more thought as the C# class does.
 		class StreamWriter 
-			: public std::ostream, public std::stringbuf
+			// : public std::ostream, public std::stringbuf
 		{
 			memory::r_ptr<Stream>		m_pStream;
 
@@ -44,18 +44,33 @@ namespace wb
 		public:
 			StreamWriter(memory::r_ptr<Stream>&& rpStream)
 				: 								
-				std::ostream(this),				
+				//std::ostream(this),
 				m_pStream(std::move(rpStream))
 			{ }
 
+			/*
 			StreamWriter(string path, bool append = true)
 				: 								
 				std::ostream(this),
 				m_pStream(memory::r_ptr<Stream>::responsible(new FileStream(path, append ? FileMode::Append : FileMode::Create)))
 			{ }
 
+			StreamWriter(wstring path, bool append = true)
+				:
+				std::ostream(this),
+				m_pStream(memory::r_ptr<Stream>::responsible(new FileStream(path, append ? FileMode::Append : FileMode::Create)))
+			{ }
+			*/
+
+			StreamWriter(const Path& path, bool append = true)
+				:
+				//std::ostream(this),
+				m_pStream(memory::r_ptr<Stream>::responsible(new FileStream(path.to_osstring(), append ? FileMode::Append : FileMode::Create)))
+			{ }
+
 			void Write(const string&);
 			void WriteLine(const string& = "");
+			void Flush();
 		};
 
 		/** Implementation **/
@@ -70,6 +85,11 @@ namespace wb
 			static const char* pszEOL = "\r\n";
 			m_pStream->Write(str.c_str(), str.length());
 			m_pStream->Write(pszEOL, 2);
+		}
+
+		inline void StreamWriter::Flush()
+		{
+			m_pStream->Flush();
 		}
 	}
 }

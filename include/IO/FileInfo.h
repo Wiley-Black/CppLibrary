@@ -44,8 +44,8 @@ namespace wb
 			DateTime LastWriteTime;
 			UInt64 Length;
 		public:			
-			FileInfo() : Length(0) { }
-			FileInfo(const string& Path);			
+			FileInfo() : Length(0) { }			
+			FileInfo(const osstring& Path);
 
 			bool IsEmpty() const { return FullName.empty(); }
 			bool operator!() const { return FullName.empty(); }
@@ -76,8 +76,8 @@ namespace wb
 		protected:
 			DirectoryInfo() { }
 
-		public:			
-			DirectoryInfo(const string& Path);
+		public:						
+			DirectoryInfo(const osstring& Path);
 
 			vector<FileInfo>		EnumerateFiles() const;
 			vector<FileInfo>		EnumerateFiles(string searchPattern) const;
@@ -94,7 +94,7 @@ namespace wb
 	{
 		/** Implementation - FileInfo **/
 
-		inline FileInfo::FileInfo(const string& sPath)
+		inline FileInfo::FileInfo(const osstring& sPath)
 		{
 			FullName = Path::StripTrailingSeparator(Path::ToAbsolutePath("", sPath));
 
@@ -129,7 +129,7 @@ namespace wb
 
 		/** Implementation - DirectoryInfo **/
 
-		inline DirectoryInfo::DirectoryInfo(const string& sPath) : FileInfo(sPath) { }
+		inline DirectoryInfo::DirectoryInfo(const osstring& sPath) : FileInfo(sPath) { }
 
 		inline vector<FileInfo> DirectoryInfo::EnumerateFiles() const
 		{

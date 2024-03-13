@@ -231,7 +231,7 @@ namespace wb
 
 		inline /*static*/ Image<UInt16> Image<UInt16>::Load(const std::string& filename, GPUStream Stream)
 		{
-			if (!io::File::Exists(filename.c_str())) throw FileNotFoundException("Image file not found.");
+			if (!io::File::Exists(to_osstring(filename).c_str())) throw FileNotFoundException("Image file not found.");
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
 			#ifdef LibTIFF_Support
@@ -332,7 +332,7 @@ namespace wb
 
 		inline /*static*/ Image<double> Image<double>::Load(const std::string& filename, GPUStream Stream)
 		{
-			if (!io::File::Exists(filename.c_str())) throw FileNotFoundException("Image file not found.");
+			if (!io::File::Exists(to_osstring(filename).c_str())) throw FileNotFoundException("Image file not found.");
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
 			#ifdef FITS_Support

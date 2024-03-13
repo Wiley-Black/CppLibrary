@@ -114,7 +114,19 @@ namespace wb
 				#endif
 
 				m_bCanRead = m_bCanWrite = false;
-				Open(sFilename.c_str(), mode, access, share);
+				Open(wb::to_osstring(sFilename).c_str(), mode, access, share);
+			}
+
+			FileStream(const wstring& sFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
+			{
+#if defined(_WINDOWS)
+				m_Handle = INVALID_HANDLE_VALUE;
+#else
+				m_Handle = -1;
+#endif
+
+				m_bCanRead = m_bCanWrite = false;
+				Open(to_osstring(sFilename).c_str(), mode, access, share);
 			}
 
 			#if defined(_WINDOWS)
@@ -149,7 +161,7 @@ namespace wb
 			~FileStream() { Close(); }
 
 			#if defined(_WINDOWS)
-			void Open(const char *pszFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
+			void Open(const TCHAR *pszFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
 			{
 				if (pszFilename == nullptr) throw ArgumentException(S("Null value for filename."));
 
@@ -190,8 +202,11 @@ namespace wb
 				default: throw ArgumentException(S("Invalid share mode flag."));
 				}				
 
-				m_Handle = ::CreateFile(to_osstring(pszFilename).c_str(), dwDesiredAccess, dwShareMode, nullptr, dwCreationDisposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+				m_Handle = ::CreateFile(pszFilename, dwDesiredAccess, dwShareMode, nullptr, dwCreationDisposition, FILE_ATTRIBUTE_NORMAL, nullptr);
 				if (m_Handle == INVALID_HANDLE_VALUE) Exception::ThrowFromWin32(::GetLastError());
+
+				if (mode == FileMode::Append)
+					::SetFilePointer(m_Handle, 0, NULL, FILE_END);
 			}
 			#else
 			void Open(const char *pszFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
