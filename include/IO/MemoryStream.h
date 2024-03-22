@@ -33,7 +33,7 @@ namespace wb
 			}
 
 		public:			
-			MemoryStream(int capacity = 4096) : m_Buffer(capacity)
+			MemoryStream(UInt64 capacity = 4096) : m_Buffer(capacity)
 			{
 				m_iPosition = 0;
 				m_nLength = 0;

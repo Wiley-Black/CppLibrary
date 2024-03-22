@@ -309,10 +309,12 @@ namespace wb
 		string asDebugString() const;											// Returns string as "DD.MM.YYYY HH.MM.SS", 24-hr clock
 		string asInternetString() const;										// Returns string as "Wkd, DD Mnt YYYY HH:MM:SS GMT", 24-hr clock (see RFC 822 & 1123)	
 		string asISO8601(int Precision = 6) const;								// Returns string as "YYYY-MM-DDTHH:MM:SS.ssssss[+/-HH:MM or Z]" as in ISO 8601.
+		void asMSDOS(UInt16& date, UInt16& time) const;
 
 		string		ToString() const;							// Same as 'asISO8601()'.  Recommended format for storage/transmission.
 		static bool	TryParse(const char*, DateTime&);			// Reads the 'asInternetString()' (always UTC) or 'asPresentationString()' (assumes local time) formats.
 		static DateTime Parse(const char*);
+		static DateTime FromMSDOS(UInt16 date, UInt16 time);
 
 		FILETIME ToFILETIME() const;
 		// void	asSystemtime( SYSTEMTIME& ) const;
@@ -1871,6 +1873,46 @@ namespace wb
 		if (!TryParse(psz, ret))
 			throw FormatException(S("Unable to parse date/time."));
 		return ret;
+	}
+
+	inline /*static*/ DateTime DateTime::FromMSDOS(UInt16 date, UInt16 time)
+	{
+		/**
+		* Bitfields for file time:
+		*	Bit(s)	Description
+		*	15-11	hours (0-23)
+		*	10-5	minutes
+		*	4-0	seconds/2
+		*/
+
+		/**
+		* Bitfields for file date:
+		*	Bit(s)	Description
+		*	15-9	year - 1980
+		*	8-5		month
+		*	4-0		day
+		*/
+
+		unsigned int second = (time & 0x1F) * 2;
+		unsigned int minute = (time >> 5) & 0x3F;
+		unsigned int hour = (time >> 11) & 0x1F;
+
+		unsigned int day = (date & 0x1F);
+		unsigned int month = (date >> 5) & 0x0F;
+		unsigned int year = ((date >> 9) & 0x7F) + 1980;
+
+		return DateTime(year, month, day, hour, minute, second);		
+	}
+
+	void DateTime::asMSDOS(UInt16& date, UInt16& time) const
+	{
+		date = (((GetYear() - 1980) & 0x7F) << 9);
+		date |= ((GetMonth() & 0x0F) << 5);
+		date |= (GetDay() & 0x1F);
+
+		time = ((GetHour() & 0x1F) << 11);
+		time |= ((GetMinute() & 0x3F) << 5);
+		time |= ((GetSecond() >> 1) & 0x1F);
 	}
 }
 

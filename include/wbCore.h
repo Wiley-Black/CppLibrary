@@ -21,6 +21,8 @@
 #include "IO/FileInfo.h"
 #include "IO/Path.h"
 #include "IO/StreamWriter.h"
+#include "IO/BinaryWriter.h"
+#include "IO/BinaryReader.h"
 
 #include "Math/Random.h"
 

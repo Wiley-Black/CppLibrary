@@ -7,6 +7,8 @@ Wiley Black's CppLibrary is my general-purpose C++ library that uses headers onl
  - To a large extent, supports both Windows and Linux seemlessly, although the Linux code needs a refresh.
  - CUDA image processing classes- although I might suggest one of the larger libraries out there for this purpose.
 
+Source: https://github.com/WileEMan/CppLibrary
+
 # Usage
 
 This is a "header-only" library that can be accessed with just an #include directive and a little configuration.  
