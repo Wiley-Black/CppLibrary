@@ -62,6 +62,7 @@ namespace wb
 			void Seek(Int64 offset, wb::io::SeekOrigin origin);
 			Int64 GetPosition();
 			void Flush();
+			memory::r_ptr<Stream>& GetStream() { return m_pStream; }
 		};
 
 		/** Implementation **/
