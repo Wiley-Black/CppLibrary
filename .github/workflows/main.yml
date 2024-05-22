@@ -22,6 +22,10 @@ jobs:
         with:
           fetch-depth: '0'
            
+      - name: Show CWD
+        shell: cmd 
+        run: ${{ 'cd' }}
+           
       - name: Compile Visual Studio project with MSBuild
         shell: cmd 
         run: ${{ '"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" && msbuild .\development\cpu_tests\wbLibraryCPUTests.vcxproj /property:Configuration=Debug /property:Platform=x64' }}
