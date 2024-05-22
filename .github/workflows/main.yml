@@ -26,7 +26,7 @@ jobs:
         shell: cmd 
         run: |
           "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
-          MSBuild .\development\cpu_tests\wbLibraryCPUTests.cvxproj /property:Configuration=Debug_CPUOnly /property:Platform=x64
+          MSBuild .\development\cpu_tests\wbLibraryCPUTests.cvxproj /property:Configuration=Debug /property:Platform=x64
 
       - name: Run tests
         shell: cmd 
