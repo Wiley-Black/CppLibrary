@@ -1,6 +1,6 @@
 /////////
 //	Path.h
-//	Copyright (C) 2014 by Wiley Black
+//	Copyright (C) 2014-2024 by Wiley Black
 ////
 
 // Include wbFoundation.h ahead in order to prevent dependency sequencing issues.  wbFoundation.h must not do anything outside of its exclusion region.
@@ -62,9 +62,11 @@ namespace wb
 				Path ret(*this);
 				ret.m_str += wb::to_osstring(other);
 				return ret;
-			}			
+			}
 
-			inline Path GetFileName() const
+			inline osstring GetFullName() const { return to_osstring(); }
+
+			inline osstring GetFileName() const
 			{
 				if (length() < 1) return os("");
 				if (length() > Int32_MaxValue) throw ArgumentOutOfRangeException();
@@ -75,7 +77,7 @@ namespace wb
 				return m_str;
 			}
 
-			inline static Path GetFileName(Path path) { return path.GetFileName(); }
+			inline static osstring GetFileName(Path path) { return path.GetFileName(); }
 
 			/// <summary>
 			/// Returns the file extension, defined as the last occurrence of '.' in the string.

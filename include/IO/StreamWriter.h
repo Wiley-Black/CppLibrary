@@ -71,6 +71,8 @@ namespace wb
 			void Write(const string&);
 			void WriteLine(const string& = "");
 			void Flush();
+
+			wb::memory::r_ptr<Stream>& GetStream() { return m_pStream; }
 		};
 
 		/** Implementation **/

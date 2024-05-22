@@ -14,12 +14,12 @@
 
 #include "Text/StringBuilder.h"
 
+#include "IO/Path.h"
 #include "IO/FileStream.h"
 #include "IO/MemoryStream.h"
 #include "IO/Console.h"
 #include "IO/File.h"
 #include "IO/FileInfo.h"
-#include "IO/Path.h"
 #include "IO/StreamWriter.h"
 #include "IO/BinaryWriter.h"
 #include "IO/BinaryReader.h"

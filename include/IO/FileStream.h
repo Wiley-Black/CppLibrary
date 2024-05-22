@@ -2,10 +2,14 @@
 	Copyright (C) 2014 by Wiley Black (TheWiley@gmail.com)
 */
 
+// Include wbFoundation.h ahead in order to enforce the order of header inclusion.
+#include "../wbFoundation.h"
+
 #ifndef __WBFileStream_h__
 #define __WBFileStream_h__
 
 #include "Streams.h"
+#include "Path.h"
 
 namespace wb
 {
@@ -93,40 +97,52 @@ namespace wb
 			}
 			#endif						
 
+			void Init()
+			{
+				#if defined(_WINDOWS)
+				m_Handle = INVALID_HANDLE_VALUE;
+				#else
+				m_Handle = -1;
+				#endif
+
+				m_bCanRead = m_bCanWrite = false;				
+			}
+
 		public:			
 
 			FileStream()
 			{
-				#if defined(_WINDOWS)
-				m_Handle = INVALID_HANDLE_VALUE;
-				#else
-				m_Handle = -1;
-				#endif
-				m_bCanRead = m_bCanWrite = false;
+				Init();				
+			}
+
+			FileStream(const char* pszFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
+			{
+				Init();
+				Open(wb::to_osstring(pszFilename).c_str(), mode, access, share);
+			}
+
+			FileStream(const wchar_t* pszFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
+			{
+				Init();
+				Open(wb::to_osstring(pszFilename).c_str(), mode, access, share);
 			}
 
 			FileStream(const string& sFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
 			{
-				#if defined(_WINDOWS)
-				m_Handle = INVALID_HANDLE_VALUE;
-				#else
-				m_Handle = -1;
-				#endif
-
-				m_bCanRead = m_bCanWrite = false;
+				Init();
 				Open(wb::to_osstring(sFilename).c_str(), mode, access, share);
 			}
 
 			FileStream(const wstring& sFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
 			{
-#if defined(_WINDOWS)
-				m_Handle = INVALID_HANDLE_VALUE;
-#else
-				m_Handle = -1;
-#endif
-
-				m_bCanRead = m_bCanWrite = false;
+				Init();
 				Open(to_osstring(sFilename).c_str(), mode, access, share);
+			}
+
+			FileStream(const Path& Filename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
+			{
+				Init();
+				Open(Filename.to_osstring().c_str(), mode, access, share);
 			}
 
 			#if defined(_WINDOWS)
@@ -142,8 +158,8 @@ namespace wb
 
 			FileStream(const FileStream& cp) { throw Exception("Cannot copy a FileStream object."); }
 			FileStream& operator=(const FileStream& cp) { throw Exception("Cannot copy a FileStream object."); }
-			FileStream(FileStream&& mv) { operator=(mv); }
-			FileStream& operator=(FileStream&& mv) 
+			FileStream(FileStream&& mv) noexcept { operator=(mv); }
+			FileStream& operator=(FileStream&& mv) noexcept
 			{
 				m_Handle = mv.m_Handle;
 				m_bCanRead = mv.m_bCanRead;
@@ -401,7 +417,7 @@ namespace wb
 
 			#if defined(_WINDOWS)
 			HANDLE GetHandle() { return m_Handle; }
-			#endif
+			#endif			
 		};
 	}
 }

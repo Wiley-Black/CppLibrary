@@ -1904,7 +1904,7 @@ namespace wb
 		return DateTime(year, month, day, hour, minute, second);		
 	}
 
-	void DateTime::asMSDOS(UInt16& date, UInt16& time) const
+	inline void DateTime::asMSDOS(UInt16& date, UInt16& time) const
 	{
 		date = (((GetYear() - 1980) & 0x7F) << 9);
 		date |= ((GetMonth() & 0x0F) << 5);
