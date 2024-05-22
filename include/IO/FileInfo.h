@@ -68,7 +68,7 @@ namespace wb
 			DateTime GetCreationTime() const { return CreationTime; }
 			DateTime GetLastWriteTime() const { return LastWriteTime; }
 			UInt64 GetLength() const { return Length; }
-			bool Exists() const;
+			virtual bool Exists() const;
 		};
 
 		class DirectoryInfo : public FileInfo
@@ -82,7 +82,7 @@ namespace wb
 			vector<FileInfo>		EnumerateFiles() const;
 			vector<FileInfo>		EnumerateFiles(string searchPattern) const;
 			vector<DirectoryInfo>	EnumerateDirectories() const;
-		};				
+		};
 	}
 }
 

@@ -1,33 +1,29 @@
+/***
+*	Tests the following major subsystems/classes:
+* 
+*		File I/O
+*		Zip Archive Reading (with no compression)
+*		XML Parsing
+*		JSON Parsing
+*		YAML Parsing
+**/
 
 #include "wbCore.h"
 #include "gtest/gtest.h"
+#include <set>
 
 using namespace std;
 using namespace wb;
 using namespace wb::xml;
+using namespace wb::memory;
+using namespace wb::io::compression;
 
 wb::io::Path unit_testing_data_folder = "..\\test_data";
 
-#if 0
-TEST(HACK, test)
-{
-	wb::io::Path YamlFile = unit_testing_data_folder / "yaml" / "test-suite" / "229Q" / "in.yaml";
-#if 1
-	string original = io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read));
-	for (auto ii = 0; ii < original.length(); ii++)
-	{
-		char ch = original[ii];
-		if (ch == '\r') std::cout << "[CR]" << std::endl;
-		else if (ch == '\n') std::cout << "[LF]";
-		else std::cout << ch;
-	}
-#else
-	string original = io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read));
-	std::cout << original;
-#endif
-	FAIL() << "Failing here.";
-}
-#endif
+// This option instructs the YAML tests to pull their tests from the .zip file instead of from a directory tree.
+// This is helpful when coming out of the git repo where LFCR can be reformatted by ensuring we have the original
+// and unaltered files.
+#define FromArchive
 
 #pragma region "Xml Parser Testing"
 
@@ -368,7 +364,17 @@ string IsEqualWithNotes(string A, string B, string ALabel, string BLabel)
 	return string();
 }
 
-#include <set>
+#ifdef FromArchive
+inline r_ptr<io::Stream> OpenTestStream(ZipArchiveEntry& fi)
+{
+	return r_ptr<io::Stream>::absolved(fi.Open());
+}
+#else
+inline r_ptr<io::Stream> OpenTestStream(FileInfo fi)
+{
+	return r_ptr<io::Stream>::responsible(new io::FileStream(fi.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read));
+}
+#endif
 
 TEST(Library, YAML)
 {
@@ -423,11 +429,23 @@ TEST(Library, YAML)
 	NoJSON.insert("WZ62");				// JSON defines 'null', but this test case is using "".  However, null illegal on the key I believe.
 
 	// Scan for all subdirectories of the test-suite folder
+	string base_path;
+#ifdef FromArchive
+	auto archive_path = unit_testing_data_folder / "yaml" / "yaml-test-suite-data-2022-01-17.zip";
+	auto archive = ZipArchive(r_ptr<Stream>::responsible(new io::FileStream(archive_path, io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read)), ZipArchiveMode::Read);
+	auto TopLevel = archive.GetRoot().EnumerateDirectories();
+	if (TopLevel.size() != 1)
+		throw FileNotFoundException("Expected archive (" + archive_path.to_string() + ") to contain exactly one top-level directory but found " + wb::to_string(TopLevel.size()));
+	auto Subdirectories = TopLevel[0].EnumerateDirectories();
+	base_path = TopLevel[0].GetFullName().to_string();
+	typedef ZipArchiveEntry FileInfo_t;
+#else
 	io::DirectoryInfo diBase(unit_testing_data_folder / "yaml" / "test-suite");
 	if (!diBase.Exists())
 	{
 		FAIL() << "\nYAML test data directory not found: " << diBase.GetFullName();
 	}
+	base_path = diBase.GetFullName();
 	vector<io::DirectoryInfo> Subdirectories = diBase.EnumerateDirectories();
 	for (int ii = 0; ii < Subdirectories.size(); ii++)
 	{
@@ -436,16 +454,19 @@ TEST(Library, YAML)
 		if (subsub.size() > 0) Subdirectories.insert(Subdirectories.end(), subsub.begin(), subsub.end());
 		// Since we've appended more subdirectories to the end of the vector we're enumerating over, they
 		// too will get descended/walked down.
-	}
+	}	
+	typedef FileInfo FileInfo_t;
+#endif
 
 	/** Scan directories for test cases that we can use **/
+	int success_count = 0, known_fails = 0, untested_cases = 0;
 	int failure_count = 0;				// Don't actually signal failure until all test cases are handled so we can see a complete picture.	
 
 	for (auto& diCase : Subdirectories)
 	{
 		// Locate .yaml and .json files within subfolder...
 		bool IsErrorCase = false;
-		FileInfo YamlFile, JsonFile, YamlEventLogFile;
+		FileInfo_t YamlFile, JsonFile, YamlEventLogFile;
 		for (auto& fi : diCase.EnumerateFiles())
 		{
 			if (IsEqualNoCase(to_string(fi.GetName()), "in.yaml")) YamlFile = fi;
@@ -457,18 +478,22 @@ TEST(Library, YAML)
 		// If both a .yaml and .json file were found, then we can compare.
 		if (!YamlFile.IsEmpty() && !JsonFile.IsEmpty() && !YamlEventLogFile.IsEmpty())
 		{
-			string snippet_id = to_string(Path::ToRelativePath(diBase.GetFullName(), diCase.GetFullName()));
+			string snippet_id = to_string(Path::ToRelativePath(base_path, diCase.GetFullName()));
 			if (KnownFails.count(snippet_id))
 			{
 				std::cout << "SKIP: " << snippet_id << " [known to not be supported]\n";
+				known_fails++;
 				continue;
 			}
 			if (IsErrorCase)
 			{
 				std::cout << "SKIP: " << snippet_id << " [error expected from this case]\n";
+				untested_cases++;
 				continue;
 			}
 			std::cout << "Starting snippet_id " << snippet_id << "\n";
+
+			string source_name = wb::to_string(diCase.GetFullName().GetFileName() + L"/" + YamlFile.GetName());
 
 			/** If debugging and you want to step through only a specific test case, uncomment the following and enter the snippet id.
 			*/			
@@ -477,13 +502,13 @@ TEST(Library, YAML)
 			string YamlParsedEventLog;
 			try
 			{
-				io::FileStream fsYaml(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);
-				YamlParsedEventLog = YamlEventLogParser::Parse(fsYaml, to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));
+				auto fsYaml = OpenTestStream(YamlFile);
+				YamlParsedEventLog = YamlEventLogParser::Parse(*fsYaml, source_name);
 			}
 			catch (std::exception& ex)
 			{
 				failure_count++;
-				string original = io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read));
+				string original = io::StreamToString(*OpenTestStream(YamlFile));
 				std::cout << "\nFailure during YAML Parsing of test case '" << snippet_id << "':\n" << string(ex.what()) << "\n" 
 					<< "\nOriginal YAML (" << original.length() << " characters) :\n" << original
 					<< "\n"
@@ -494,8 +519,8 @@ TEST(Library, YAML)
 			string YamlEventLogFromFile;
 			try
 			{				
-				io::FileStream fsLog(YamlEventLogFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);
-				YamlEventLogFromFile = StreamToString(fsLog);
+				auto fsLog = OpenTestStream(YamlEventLogFile);				
+				YamlEventLogFromFile = StreamToString(*fsLog);
 			}
 			catch (std::exception& ex)
 			{
@@ -511,7 +536,7 @@ TEST(Library, YAML)
 			if (diff.length())
 			{
 				failure_count++;
-				string original = io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read));
+				string original = io::StreamToString(*OpenTestStream(YamlFile));				
 				std::cout << "\nMismatch of YAML to target YAML event log in test case '" << snippet_id << "':"
 					<< "\nOriginal YAML (" << original.length() << " characters) :\n" << original
 					<< "\nYAML events:\n" << YamlParsedEventLog << "\n"
@@ -529,15 +554,15 @@ TEST(Library, YAML)
 
 			string YamlParsedToJson;			
 			try
-			{
-				io::FileStream fsYaml(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);
-				auto Documents = wb::yaml::YamlParser::Parse(fsYaml, to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));				
+			{				
+				auto fsYaml = OpenTestStream(YamlFile);
+				auto Documents = wb::yaml::YamlParser::Parse(*fsYaml, source_name);
 				wb::yaml::JsonWriterOptions Options;
 				Options.UnquoteNumbers = true;
 				//if (pNode == nullptr) pNode = unique_ptr<wb::yaml::YamlNode>(new wb::yaml::YamlScalar("empty document"));
 				if (Documents.size() == 0) throw NotSupportedException("No document received from YamlParser.");
 				if (Documents.size() > 1) {
-					string original = io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read));
+					string original = io::StreamToString(*OpenTestStream(YamlFile));					
 					std::cout << "\nMultiple documents received from YamlParser in test case '" << snippet_id << "':"
 						<< "\nOriginal YAML (" << original.length() << " characters) :\n" << original
 						<< "\nYAML Event Log:\n" << YamlEventLogFromFile << "\n"
@@ -558,7 +583,7 @@ TEST(Library, YAML)
 			{
 				// To get consistent results from the JSON parser vs YAML parser, run YAML->JSON->JSON.  That is, run the output of the
 				// Yaml "ToJson()" through the Json parser to get consistent Json format.				
-				pYamlParsedToJsonParsed = wb::json::JsonParser::ParseString(YamlParsedToJson.c_str(), "YAML->JSON of " + to_string(diCase.GetName()) + "/" + to_string(YamlFile.GetName()));
+				pYamlParsedToJsonParsed = wb::json::JsonParser::ParseString(YamlParsedToJson.c_str(), "YAML->JSON of " + source_name);
 			}
 			catch (std::exception& ex)
 			{
@@ -570,8 +595,8 @@ TEST(Library, YAML)
 			unique_ptr<wb::json::JsonValue> pJsonParsed;
 			try
 			{								
-				io::FileStream fsJson(JsonFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read);				
-				pJsonParsed = wb::json::JsonParser::Parse(fsJson, to_string(diCase.GetName()) + "/" + to_string(JsonFile.GetName()));				
+				auto fsJson = OpenTestStream(JsonFile);
+				pJsonParsed = wb::json::JsonParser::Parse(*fsJson, source_name);
 			}
 			catch (std::exception& ex)
 			{
@@ -581,7 +606,7 @@ TEST(Library, YAML)
 			if (!json::IsEqual(pYamlParsedToJsonParsed, pJsonParsed, /*Strict=*/ false))
 			{
 				failure_count++;
-				string original = io::StreamToString(io::FileStream(YamlFile.GetFullName(), io::FileMode::Open, io::FileAccess::Read, io::FileShare::Read));
+				string original = io::StreamToString(*OpenTestStream(YamlFile));				
 				std::cout << "\nMismatch of YAML to target JSON in test case '" << snippet_id << "':"
 					<< "\nOriginal YAML (" << original.length() << " characters) :\n" << original
 					<< "\nYAML -> JSON:\n" << pYamlParsedToJsonParsed->ToString() << "\n"					
@@ -590,12 +615,18 @@ TEST(Library, YAML)
 					;				
 				continue;
 			}
+
+			success_count++;
 		}
 	}
 
 	if (failure_count > 0)
 	{
 		FAIL() << "\n" << to_string(failure_count) << " YAML test cases failed.\n";
+	}
+	else
+	{
+		std::cout << success_count << " YAML test cases succeeded.  " << known_fails << " additional are known to fail (unsupported) and " << untested_cases << " cases were not tested." << std::endl;
 	}
 }
 

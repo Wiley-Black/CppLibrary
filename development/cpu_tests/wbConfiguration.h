@@ -13,7 +13,8 @@
 
 /** DeflateStream Implementation Method **/
 //#define DeflateStream_ZLibImpl			// Use the efficient zlib implementation, with dependency on the library.
-#define DeflateStream_InternImpl		// Use an internal implementation with no further dependencies.
+//#define DeflateStream_InternImpl		// Use an internal implementation with no further dependencies.
+#define No_DeflateStream				// Do not provide an implementation of DEFLATE compression.
 
 /** Image Implementation Method **/
 //#define CUDA_Support					// Define to provide CUDA support for image processing.

@@ -23,6 +23,7 @@
 #include "IO/StreamWriter.h"
 #include "IO/BinaryWriter.h"
 #include "IO/BinaryReader.h"
+#include "IO/Compression/ZipFile.h"
 
 #include "Math/Random.h"
 
