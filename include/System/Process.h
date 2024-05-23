@@ -16,6 +16,7 @@ namespace wb { namespace sys {
 
 	class Process
 	{
+		HANDLE m_hThread;
 		HANDLE m_hProcess;
 
 		string EnvironmentToStrings(const vector<string>& Environ)
@@ -34,8 +35,13 @@ namespace wb { namespace sys {
 		}
 
 	public:
-		Process() { m_hProcess = INVALID_HANDLE_VALUE; }
+		Process() { m_hProcess = m_hThread = INVALID_HANDLE_VALUE; }
 		~Process() { 
+			if (m_hThread != INVALID_HANDLE_VALUE) {
+				CloseHandle(m_hThread);
+				m_hThread = INVALID_HANDLE_VALUE;
+			}
+
 			if (m_hProcess != INVALID_HANDLE_VALUE) {
 				CloseHandle(m_hProcess);
 				m_hProcess = INVALID_HANDLE_VALUE;
@@ -64,6 +70,7 @@ namespace wb { namespace sys {
 				/*lpStartupInfo=*/ &si,
 				/*lpProcessInformation=*/ &pi)
 				) Exception::ThrowFromWin32(GetLastError());
+			m_hThread = pi.hThread;
 			m_hProcess = pi.hProcess;
 		}
 
@@ -93,6 +100,7 @@ namespace wb { namespace sys {
 				/*lpStartupInfo=*/ &si,
 				/*lpProcessInformation=*/ &pi)
 				) Exception::ThrowFromWin32(GetLastError());
+			m_hThread = pi.hThread;
 			m_hProcess = pi.hProcess;
 		}
 
@@ -122,6 +130,7 @@ namespace wb { namespace sys {
 				/*lpStartupInfo=*/ &si,
 				/*lpProcessInformation=*/ &pi)
 				) Exception::ThrowFromWin32(GetLastError());
+			m_hThread = pi.hThread;
 			m_hProcess = pi.hProcess;
 		}
 
@@ -155,6 +164,7 @@ namespace wb { namespace sys {
 				/*lpStartupInfo=*/ &si,
 				/*lpProcessInformation=*/ &pi)
 				) Exception::ThrowFromWin32(GetLastError());
+			m_hThread = pi.hThread;
 			m_hProcess = pi.hProcess;
 		}
 
