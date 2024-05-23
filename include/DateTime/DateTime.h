@@ -11,7 +11,7 @@
 	- The data content is comprised of:
 		- Number of seconds elapsed since epoch (signed 64-bit).
 		- Number of nanoseconds elapsed from second (unsigned 32-bit).
-		- Bias (in seconds) from UTC.	
+		- Bias (in seconds) from UTC (negative west of the prime meridian, positive east)
 	- The epoch is year zero, time zero.
 
 	Conversions:
@@ -64,6 +64,26 @@
 		-	Non-Leap Year:  Feb has 28 days.  Year has 365 days.
 		-	Leap Year:		Feb has 29 days.  Year has 366 days.		
 
+	Regarding Time Zones:
+
+		The Win32 GetTimeZoneInformation() API defines all translations between UTC time and local time based on the following formula:
+		
+			UTC = local time + bias
+		
+		By contrast, ISO-8601 specifies the civil time and describes the offset to UTC to get the civil time.  For example:
+		
+			If UTC is:           2024-05-21 15:30:01Z
+			EST (UTC-05) is:     2024-05-21 10:30:01-05:00
+
+		The DateTime class defines the bias as the bias of the represented time from UTC.  Therefore, it
+		is opposite the GetTimeZoneInformation() API definition above and follows the relation:
+		
+			UTC + bias = local time
+
+			UTC (in seconds) = m_nSeconds - m_nBias.
+
+		The above EST time example would have a bias value of (-5 * 60) because that is the represented time's bias from UTC.
+
 	Limitations:
 
 		Projection of times into different eras is not performed.  For example, calculating a time value
@@ -112,6 +132,17 @@ typedef struct _FILETIME {
   UInt32 dwLowDateTime;
   UInt32 dwHighDateTime;
 } FILETIME, *PFILETIME;
+
+typedef struct _SYSTEMTIME {
+	WORD wYear;
+	WORD wMonth;
+	WORD wDayOfWeek;
+	WORD wDay;
+	WORD wHour;
+	WORD wMinute;
+	WORD wSecond;
+	WORD wMilliseconds;
+} SYSTEMTIME, * PSYSTEMTIME, * LPSYSTEMTIME;
 #endif
 
 namespace wb
@@ -194,13 +225,13 @@ namespace wb
 			/** Hour specified as (0-23) **/
 			/** Minutes and seconds specified as (0-59) **/
 			/** Bias is the bias from UTC time, in minutes (+/- 1439 or the special value 'LocalTimeZone') **/
-			/** UTC = time/date-specified + Bias **/
-			/** e.g. For a time/date specified in U.S. Mountain Standard Time, outside DST, the Bias would be +(7 * 60). **/				
+			/** UTC = time/date-specified - Bias **/
+			/** e.g. For a time/date specified in U.S. Mountain Standard Time, outside DST, the Bias would be -(7 * 60). **/				
 		DateTime(int nYear, int nMonth, int nDay, int nHour, int nMinute, int nSecond, int nNanosecond = 0, int nBiasMinutes = LocalTimeZone);
 		DateTime(const DateTime&);
 		DateTime(DateTime&&);
 		DateTime(FILETIME);
-		//DateTime( const SYSTEMTIME&, int nBiasMinutes = LocalTimeZone );
+		DateTime(const SYSTEMTIME&, int nBiasMinutes = LocalTimeZone);
 		DateTime(time_t);				// Note: The value will be in UTC time.  Conversions are possible, see usage.
 		DateTime();	
 
@@ -256,7 +287,7 @@ namespace wb
 			// For range of parameters, see matching constructor.		
 		void	Set(int nYear, int nMonth, int nDay, int nHour, int nMinute, int nSecond, int nNanoseconds = 0, int nBiasMinutes = LocalTimeZone);
 		void	Set(time_t);
-		void	Set(UInt64 Seconds, UInt32 Nanoseconds, int nBiasSeconds /*= 0 for UTC*/);
+		void	Set(UInt64 Seconds, UInt32 Nanoseconds, int nBiasSeconds);
 
 			// The Add...() functions can accept negative values.
 			// The Add...() functions can accept values beyond one unit (for example, you can add 3600 seconds.)
@@ -317,7 +348,7 @@ namespace wb
 		static DateTime FromMSDOS(UInt16 date, UInt16 time);
 
 		FILETIME ToFILETIME() const;
-		// void	asSystemtime( SYSTEMTIME& ) const;
+		SYSTEMTIME ToSYSTEMTIME() const;
 
 			// Returns the number of seconds since Midnight (00:00:00) on Year zero.
 		Int64	GetSeconds() const { return m_nSeconds; }
@@ -334,9 +365,10 @@ namespace wb
 		Int64	GetUTCSeconds() const { return m_nSeconds - m_nBias; }
 
 			// Returns the number of seconds since Midnight (00:00:00) on Year zero after converting to local time.		
+			// UTC = LocalValue - Bias -> LocalValue = UTC + Bias.
 		Int64	GetLocalSeconds() const { return (m_nSeconds - (Int64)m_nBias + (Int64)GetLocalBias()); }
 
-			// Returns the bias, in seconds, applied when working in the local time zone.  UTC = Value + Bias.
+			// Returns the bias, in seconds, applied when working in the local time zone.  UTC = Value - Bias.
 		static int	GetLocalBias();
 
 		/* Syntactically nice, but being static variables makes it harder on "header-only" library. 
@@ -417,10 +449,10 @@ namespace wb
 	inline DateTime::DateTime(){ m_nSeconds = 0ull; m_nNanoseconds = 0; m_nBias = 0; }
 	inline DateTime::DateTime(const DateTime& cp){ m_nSeconds = cp.m_nSeconds; m_nNanoseconds = cp.m_nNanoseconds; m_nBias = cp.m_nBias; }
 	inline DateTime::DateTime(DateTime&& cp){ m_nSeconds = cp.m_nSeconds; m_nNanoseconds = cp.m_nNanoseconds; m_nBias = cp.m_nBias; }
-	inline DateTime::DateTime(time_t nValue){ Set( nValue ); }
-	inline DateTime::DateTime(int nYear, int nMonth, int nDay, int nHour, int nMinute, int nSecond, int nNanosecond /*= 0*/, int nBias /*= LocalTimeZone*/)
+	inline DateTime::DateTime(time_t nValue){ Set(nValue); }
+	inline DateTime::DateTime(int nYear, int nMonth, int nDay, int nHour, int nMinute, int nSecond, int nNanosecond /*= 0*/, int nBiasMinutes /*= LocalTimeZone*/)
 	{
-		Set( nYear, nMonth, nDay, nHour, nMinute, nSecond, nNanosecond, nBias );
+		Set(nYear, nMonth, nDay, nHour, nMinute, nSecond, nNanosecond, nBiasMinutes);
 	}	
 	inline DateTime::DateTime(FILETIME ft)
 	{
@@ -434,6 +466,7 @@ namespace wb
 	}
 	inline FILETIME DateTime::ToFILETIME() const
 	{
+		// Note: FILETIME is only valid from year 1601 to 30827.		
 		static const UInt64 PerSecond = 10000000ull;
 		DateTime UTC = asUTC();
 		UInt64	iFiletime = UTC.m_nSeconds - DateTime_g_nOffsetForFiletime;
@@ -444,24 +477,28 @@ namespace wb
 		ret.dwHighDateTime = (UInt32)(iFiletime >> 32ull);
 		return ret;
 	}
-#	if 0
-	inline DateTime::DateTime( const SYSTEMTIME& st, int nBias /*= LocalTimeZone*/ )
+	inline DateTime::DateTime(const SYSTEMTIME& st, int nBiasMinutes /*= LocalTimeZone*/)
 	{
-		Set( st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, nBias );
+		Set(st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds * 1000000, nBiasMinutes);
 	}
-	inline void DateTime::asSystemtime( SYSTEMTIME& st ) const
+	inline SYSTEMTIME DateTime::ToSYSTEMTIME() const
 	{
-		int nYear, nMonth, nDay, nHour, nMinute, nSecond;
-		Get( nYear, nMonth, nDay, nHour, nMinute, nSecond );
+		int nYear, nMonth, nDay, nHour, nMinute, nSecond, nNanosecond;
+		Get(nYear, nMonth, nDay, nHour, nMinute, nSecond, nNanosecond);
+		if (nYear < 0 || nYear >(Int32)UInt16_MaxValue) throw NotSupportedException(S("Cannot calculate SYSTEMTIME for years outside of 16-bit range."));
+		DayOfWeek dow;
+		GetDayOfWeek(dow);
+		SYSTEMTIME st;
 		st.wYear = nYear;
-		st.wMonth = nMonth;
+		st.wMonth = nMonth;		
+		st.wDayOfWeek = (int)dow;	// enum uses same numbering values as SYSTEMTIME
 		st.wDay = nDay;
 		st.wHour = nHour;
 		st.wMinute = nMinute;
 		st.wSecond = nSecond;
-		st.wMilliseconds = 0;
+		st.wMilliseconds = nNanosecond / 1000000;
+		return st;
 	}
-#	endif	
 
 	inline /*static*/ bool DateTime::IsLeapYear(int nYear)
 	{
@@ -574,6 +611,7 @@ namespace wb
 		nDay = GetDaysFromRemainder( nRemainder ) + 1;
 		nHour = GetHoursFromRemainder( nRemainder );
 		nMinute = GetMinutesFromRemainder( nRemainder );
+		nSecond = (int)nRemainder;
 		nNanosecond = m_nNanoseconds;
 	}
 
@@ -780,10 +818,10 @@ namespace wb
 		m_nBias			= 0;						// time_t values are specified in UTC time.		
 	}
 
-	inline void DateTime::Set(UInt64 nSeconds, UInt32 nNanoseconds, int nBias){
+	inline void DateTime::Set(UInt64 nSeconds, UInt32 nNanoseconds, int nBiasSeconds){
 		m_nSeconds		= nSeconds;
 		m_nNanoseconds	= nNanoseconds;
-		m_nBias			= nBias;
+		m_nBias			= nBiasSeconds;
 	}
 
 	inline DateTime	DateTime::asUTC() const {
@@ -913,12 +951,19 @@ namespace wb
 		sprintf(pszB, S("%0*.*f"), (Precision + 3), Precision, dSecond);
 		#endif
 
-		if( abs(GetBias()) > 60 )
+		if (abs(GetBias()) >= 60)
 		{
-			int nBias = GetBias();		// In seconds...
-			int nBiasHours = nBias / 3600;
-			nBias = nBias % 3600;		// Remaining seconds...
-			UInt32 nBiasMinutes = abs( nBias / 60 );
+			// Example A: 18:00 in UTC, but current value is 13:40 with bias of -04:20.
+			// -04:20 = 4 hours and 20 minutes = - (4 hours * 3600) - (20 minutes * 60) = -15600 seconds.
+			// Example B: 18:00 in UTC, but current value is 19:10 with bias of +01:10.
+			// +01:10 = 1 hours and 10 minutes = (1 hour * 3600) + (10 minutes * 60) = +4200 seconds.
+			int nBias = GetBias();						// Examples: -15600 seconds, +4200 seconds
+
+			int sign = (nBias >= 0) ? 1 : -1;
+			int nBiasHours = sign * (abs(nBias) / 3600);		// Examples: -4 hours, 1 hour
+
+			int nRem = abs(nBias) % 3600;		// Remaining seconds after extracting the hours (examples: 1200 which is 20 minutes, 600 which is 10 minutes).
+			UInt32 nBiasMinutes = nRem / 60;
 			char pszC[64];
 			#if defined(_MSC_VER)
 			sprintf_s(pszC, S("%+03d:%02u"), nBiasHours, nBiasMinutes);
@@ -980,6 +1025,8 @@ namespace wb
 
 	inline /*static*/ int DateTime::GetLocalBias()
 	{
+		// See top of this header for some discussion.
+
 		int	nBiasMinutes;
 #	ifdef _WIN32
 		TIME_ZONE_INFORMATION	tzi;
@@ -991,45 +1038,43 @@ namespace wb
 		case TIME_ZONE_ID_STANDARD:	nBiasMinutes = tzi.Bias + tzi.StandardBias; break;
 		case TIME_ZONE_ID_DAYLIGHT:	nBiasMinutes = tzi.Bias + tzi.DaylightBias; break;
 		}
-#	elif defined(_LINUX)
 
-		// Get GMT timezone offset...
+		// Definition here is opposite the GetTimeZoneInformation() definition.
+		//
+		//	GetTimeZoneInformation():		UTC = local time + bias
+		//	DateTime:						UTC + bias = local time
+		nBiasMinutes = -nBiasMinutes;
+#	elif defined(_LINUX)		
+
+		// Get the local time information right now, although all we care about is the GMT offset value.				
 		time_t t = time(NULL);
 		struct tm lt = { 0 };
 		localtime_r(&t, &lt);
+
+		// According to libc docs, tm_gmtoff gives the number of seconds that you must add to UTC to get
+		// local time:
+		//
+		//	UTC + bias = local time
+		//	UTC + tm_gmtoff = local time
+		//
+		// This happens to match my convention here.
 		return lt.tm_gmtoff;		// It even happens to be in seconds.  Not sure on portability.
 
 #	else
 #		error Platform-specific code is required for retrieving and calculating time zone bias information.
 #	endif
 
-		assert(nBiasMinutes > -1440 && nBiasMinutes < 1440);	// Possible range for bias is +/- 23.99 hours.
+		assert(nBiasMinutes > -1440 && nBiasMinutes < 1440);	// Possible range for bias is +/- 23.99 hours.		
 
 		return (nBiasMinutes * 60 /* seconds/minute */);
+
 	}// End GetLocalBias()
 
 	inline /*static*/ void DateTime::SetSystemTime(const DateTime& to)
 	{
 #if defined(_WINDOWS)
 
-		int nYear, nMonth, nDay, nHour, nMinute, nSecond, nNanosecond;
-
-		if (!to.IsUTC()) {
-			DateTime   dtUTC = to.asUTC();
-			dtUTC.Get(nYear, nMonth, nDay, nHour, nMinute, nSecond, nNanosecond);
-		}
-		else
-			to.Get(nYear, nMonth, nDay, nHour, nMinute, nSecond, nNanosecond);
-
-		SYSTEMTIME  st;
-		if (nYear < 0 || nYear >(Int32)UInt16_MaxValue) throw NotSupportedException(S("Cannot set system time year outside of 16-bit range."));
-		st.wYear = (UInt16)nYear;
-		st.wMonth = nMonth;
-		st.wDay = nDay;
-		st.wHour = nHour;
-		st.wMinute = nMinute;
-		st.wSecond = nSecond;
-		st.wMilliseconds = nNanosecond / 1000000;
+		SYSTEMTIME  st = to.asUTC().ToSYSTEMTIME();
 		if (!::SetSystemTime(&st)) Exception::ThrowFromWin32(::GetLastError());
 
 #elif defined(_LINUX)
