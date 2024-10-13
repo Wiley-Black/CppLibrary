@@ -34,7 +34,7 @@ namespace wb
 			{
 				auto ret = ImageStack<PixelType>();
 				FreeImage_SetOutputMessage(FI::ErrorHandler);
-				FREE_IMAGE_FORMAT fif = FI::GetFormat(wb::io::Path::GetExtension(wb::to_string(filename)));
+				FREE_IMAGE_FORMAT fif = FI::GetFormat(wb::io::Path::GetExtension(filename));
 				//FILE* pFile = _tfopen(filename, "rb");
 				//auto pMB = FreeImage_OpenMultiBitmapFromHandle(fif, &io, (fi_handle)pFile, flags);
 				auto pMB = FreeImage_OpenMultiBitmap(fif, wb::to_string(filename).c_str(), false, true, false);
