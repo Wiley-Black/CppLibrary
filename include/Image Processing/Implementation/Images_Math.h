@@ -37,8 +37,8 @@ namespace wb
 			Image& operator=(Image&&) = default;
 			Image& operator=(Image&) = delete;
 
-			static Image Load(const std::string& filename, GPUStream Stream = GPUStream::None());
-			void Save(const std::string& filename);
+			static Image Load(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void Save(const osstring& filename);
 		};
 
 		template<>
@@ -59,8 +59,8 @@ namespace wb
 			Image& operator=(Image&&) = default;
 			Image& operator=(Image&) = delete;
 
-			static Image Load(const std::string& filename, GPUStream Stream = GPUStream::None());
-			void Save(const std::string& filename);
+			static Image Load(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void Save(const osstring& filename);
 		};
 
 		#pragma endregion
@@ -70,6 +70,12 @@ namespace wb
 
 		namespace NPPI
 		{
+			#if (CUDART_VERSION >= 12000)			// CUDA 12+
+			typedef size_t buffer_size_t;
+			#else
+			typedef int buffer_size_t;
+			#endif
+
 			template<> struct Behaviors<byte>
 			{
 				static NppStatus SumReal(const Npp8u* pSrc, int nSrcStep, NppiSize oSizeROI, Npp8u* pDeviceBuffer, Npp64f* pSum, NppStreamContext nppStreamCtx)
@@ -88,19 +94,19 @@ namespace wb
 				{
 					return nppiMean_StdDev_8u_C1R_Ctx(pSrc, nSrcStep, oSizeROI, pDeviceBuffer, pMean, pStdDev, nppStreamCtx);
 				}
-				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiSumGetBufferHostSize_8u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMinRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMinRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMinGetBufferHostSize_8u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMaxRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMaxRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMaxGetBufferHostSize_8u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMeanAndStdDevRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMeanAndStdDevRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMeanStdDevGetBufferHostSize_8u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
@@ -131,19 +137,19 @@ namespace wb
 				{
 					return nppiMean_StdDev_16u_C1R_Ctx(pSrc, nSrcStep, oSizeROI, pDeviceBuffer, pMean, pStdDev, nppStreamCtx);
 				}
-				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiSumGetBufferHostSize_16u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMinRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMinRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMinGetBufferHostSize_16u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMaxRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMaxRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMaxGetBufferHostSize_16u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMeanAndStdDevRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMeanAndStdDevRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMeanStdDevGetBufferHostSize_16u_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
@@ -166,19 +172,19 @@ namespace wb
 				{
 					return nppiMean_StdDev_32f_C1R_Ctx(pSrc, nSrcStep, oSizeROI, pDeviceBuffer, pMean, pStdDev, nppStreamCtx);
 				}
-				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiSumGetBufferHostSize_32f_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMinRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMinRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMinGetBufferHostSize_32f_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMaxRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMaxRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMaxGetBufferHostSize_32f_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
-				static NppStatus GetMeanAndStdDevRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetMeanAndStdDevRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiMeanStdDevGetBufferHostSize_32f_C1R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
@@ -197,7 +203,7 @@ namespace wb
 				{
 					return nppiSum_8u_C3R_Ctx(pSrc, nSrcStep, oSizeROI, pDeviceBuffer, pSum3, nppStreamCtx);
 				}
-				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiSumGetBufferHostSize_8u_C3R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
@@ -208,7 +214,7 @@ namespace wb
 				{
 					return nppiSum_8u_AC4R_Ctx(pSrc, nSrcStep, oSizeROI, pDeviceBuffer, pSum3, nppStreamCtx);
 				}
-				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, int* hpBufferSize, NppStreamContext nppStreamCtx)
+				static NppStatus GetSumRealBufferSize(NppiSize oSizeROI, buffer_size_t* hpBufferSize, NppStreamContext nppStreamCtx)
 				{
 					return nppiSumGetBufferHostSize_8u_AC4R_Ctx(oSizeROI, hpBufferSize, nppStreamCtx);
 				}
@@ -219,7 +225,7 @@ namespace wb
 				{
 					return nppsSum_32fc_Ctx(pSrc, nLength, pSum, pDeviceBuffer, nppStreamCtx);
 				}
-				static NppStatus GetSumComplexBufferSize(int nLength, int* hpBufferSize) {
+				static NppStatus GetSumComplexBufferSize(int nLength, buffer_size_t* hpBufferSize) {
 					return nppsSumGetBufferSize_32fc(nLength, hpBufferSize);
 				}
 			};
@@ -229,7 +235,7 @@ namespace wb
 				{
 					return nppsSum_64fc_Ctx(pSrc, nLength, pSum, pDeviceBuffer, nppStreamCtx);
 				}
-				static NppStatus GetSumComplexBufferSize(int nLength, int* hpBufferSize) {
+				static NppStatus GetSumComplexBufferSize(int nLength, buffer_size_t* hpBufferSize) {
 					return nppsSumGetBufferSize_64fc(nLength, hpBufferSize);
 				}
 			};
@@ -683,7 +689,7 @@ namespace wb
 			case DataState::Device:
 			{
 				NppiSize oSizeROI = ROI;
-				int BufferSize = 0;
+				NPPI::buffer_size_t BufferSize = 0;
 				cudaThrowable(NPPI::Behaviors<PixelType>::GetSumRealBufferSize(oSizeROI, &BufferSize, Stream()));
 				while (m_Stream.GetScratch().size() < 2) m_Stream.GetScratch().push_back(cuda::memory::DeviceScratchBuffer());
 				m_Stream.GetScratch()[0].Allocate(BufferSize);
@@ -878,7 +884,7 @@ namespace wb
 			case DataState::Device:
 			{
 				NppiSize oSizeROI = Bounds();
-				int BufferSize = 0;
+				NPPI::buffer_size_t BufferSize = 0;
 				cudaThrowable(NPPI::Behaviors<PixelType>::GetMaxRealBufferSize(oSizeROI, &BufferSize, Stream()));
 				while (m_Stream.GetScratch().size() < 2) m_Stream.GetScratch().push_back(cuda::memory::DeviceScratchBuffer());
 				m_Stream.GetScratch()[0].Allocate(BufferSize);

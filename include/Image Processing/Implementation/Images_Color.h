@@ -87,8 +87,8 @@ namespace wb
 			Image<RGBAPixel>& ConvertTo(Image<RGBAPixel>& dst, byte Alpha = 255);
 			template<typename ToPixelType> Image<ToPixelType> ConvertTo(byte Alpha = 255, HostFlags HostFlags = HostFlags::Retain);
 
-			static Image<RGBPixel> Load(const string& filename, GPUStream Stream = GPUStream::None());
-			void Save(const string& filename);
+			static Image<RGBPixel> Load(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void Save(const osstring& filename);
 			void Save(wb::io::Stream& Stream, FileFormat Format);			
 		};
 
@@ -116,9 +116,9 @@ namespace wb
 			//static Image<RGBAPixel> CopyFrom(const Image<double>&, Image<double>::Range ValueRange = Image<double>::UnitRange, byte Alpha = 255);
 			static Image<RGBAPixel> CopyFrom(Image<RGBPixel>&, byte Alpha = 255);
 			
-			static Image<RGBAPixel> Load(const string& filename, GPUStream Stream = GPUStream::None());
+			static Image<RGBAPixel> Load(const osstring& filename, GPUStream Stream = GPUStream::None());
 			static Image<RGBAPixel> Load(wb::io::Stream& Stream, FileFormat Format, GPUStream gpuStream = GPUStream::None());
-			void Save(const string& filename);			
+			void Save(const osstring& filename);
 			void Save(wb::io::Stream& Stream, FileFormat Format);						
 
 			#if 0

@@ -179,19 +179,27 @@ namespace wb
 
 		#pragma region "NVIDIA Performance Primitives (NPP) Library Interface"
 
-		enum class InterpolationMethods
-		{
-			NearestNeighbor = NPPI_INTER_NN,
-			Linear = NPPI_INTER_LINEAR,
-			Cubic = NPPI_INTER_CUBIC,
-			Super = NPPI_INTER_SUPER,
-			Lanczos = NPPI_INTER_LANCZOS
-		};
-
 		// NPP = NVIDIA Performance Primitives
 		// NPPI = NVIDIA Performance Primitives, Imaging
 
-		#ifdef NPP_Support		
+		#ifdef NPP_Support
+		enum class InterpolationMethods
+		{
+			Undefined = NPPI_INTER_UNDEFINED,        /**<  Undefined filtering interpolation mode. */
+			NearestNeighbor = NPPI_INTER_NN,        /**<  Nearest neighbor filtering. */
+			Linear = NPPI_INTER_LINEAR,        /**<  Linear interpolation. */
+			Cubic = NPPI_INTER_CUBIC,        /**<  Cubic interpolation. */
+			Cubic2P_BSpline = NPPI_INTER_CUBIC2P_BSPLINE,              /**<  Two-parameter cubic filter (B=1, C=0) */
+			Cubic2P_CatMullRom = NPPI_INTER_CUBIC2P_CATMULLROM,           /**<  Two-parameter cubic filter (B=0, C=1/2) */
+			Cubic2P_B05C03 = NPPI_INTER_CUBIC2P_B05C03,               /**<  Two-parameter cubic filter (B=1/2, C=3/10) */
+			Super = NPPI_INTER_SUPER,        /**<  Super sampling. */
+			Lanczos = NPPI_INTER_LANCZOS,       /**<  Lanczos filtering. */
+			Lanczos3_Advanced = NPPI_INTER_LANCZOS3_ADVANCED,       /**<  Generic Lanczos filtering with order 3. */
+			SmoothEdge = NPPI_SMOOTH_EDGE	/**<  Smooth edge filtering. */
+		};
+		#endif
+		
+		#ifdef NPP_Support
 		namespace NPPI
 		{
 			template<typename PixelType, typename KernelType> struct FilterBehaviors
@@ -433,8 +441,8 @@ namespace wb
 				return FileFormat::Unrecognized;
 			}
 
-			static FinalType LoadGeneric(const std::string& filename, GPUStream Stream = GPUStream::None());
-			void SaveGeneric(const std::string& filename, bool ApplyCompression = true);
+			static FinalType LoadGeneric(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void SaveGeneric(const osstring& filename, bool ApplyCompression = true);
 
 			#pragma endregion		
 
@@ -848,7 +856,9 @@ namespace wb
 			const PixelType* GetHostScanlinePtr(int yy) const { Synchronize(); return (const PixelType*)(((byte*)m_HostData.m_pData) + yy * m_HostData.m_Stride); }
 			
 			int GetHostDataStride() const { return m_HostData.m_Stride; }
+			#ifdef CUDA_Support
 			int GetDeviceDataStride() const { return m_DeviceData.m_Stride; }
+			#endif
 
 			PixelType& operator() (int xx, int yy) { ToHost(); Synchronize(); return *(PixelType*)(((byte*)m_HostData.m_pData) + xx * sizeof(PixelType) + yy * m_HostData.m_Stride); }
 			const PixelType& operator() (int xx, int yy) const {

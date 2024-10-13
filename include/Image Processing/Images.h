@@ -54,8 +54,8 @@ namespace wb
 			Image& operator=(Image&&) = default;
 			Image& operator=(Image&) = delete;
 
-			static Image Load(const std::string& filename, GPUStream Stream = GPUStream::None());
-			void Save(const string& sFilename);
+			static Image Load(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void Save(const osstring& sFilename);
 			void Save(wb::io::Stream& Stream, FileFormat format);
 		};
 
@@ -82,8 +82,8 @@ namespace wb
 			Image<float>& ConvertTo(Image<float>& dst);
 			template<typename PixelTypeDst> Image<PixelTypeDst> ConvertTo(HostFlags Flags = HostFlags::Retain);
 
-			static Image Load(const std::string& filename, GPUStream Stream = GPUStream::None());
-			void Save(const std::string& filename);
+			static Image Load(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void Save(const osstring& filename);
 		};		
 
 		#pragma endregion
@@ -115,8 +115,8 @@ namespace wb
 			template<typename ToPixelType> Image<ToPixelType> ConvertTo(Range SrcValueRange = Range::Unit, HostFlags flags = HostFlags::Retain);
 			Image<double>& ConvertTo(Image<double>& dst);
 
-			static Image Load(const std::string& filename, GPUStream Stream = GPUStream::None());
-			void Save(const std::string& filename);
+			static Image Load(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void Save(const osstring& filename);
 			void Save(wb::io::Stream& Stream, FileFormat Format);
 		};
 
@@ -153,8 +153,8 @@ namespace wb
 			
 			Image<float>& ConvertTo(Image<float>& dst);
 
-			static Image Load(const std::string& filename, GPUStream Stream = GPUStream::None());
-			void Save(const std::string& filename);
+			static Image Load(const osstring& filename, GPUStream Stream = GPUStream::None());
+			void Save(const osstring& filename);
 			void Save(wb::io::Stream& Stream, FileFormat Format);
 		};		
 

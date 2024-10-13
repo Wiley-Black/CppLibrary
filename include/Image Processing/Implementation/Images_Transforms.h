@@ -73,13 +73,13 @@ namespace wb
 					pSrcScanline = (byte*)GetHostScanlinePtr(0);
 					kind = cudaMemcpyHostToHost;
 					nSrcStride = m_HostData.m_Stride;
-					break;				
+					break;
 				case DataState::HostAndDevice:
 				case DataState::Device:
 					pSrcScanline = (byte*)GetDeviceDataPtr();
 					kind = cudaMemcpyDeviceToHost;
 					nSrcStride = m_DeviceData.m_Stride;
-					break;				
+					break;
 				default:
 					throw NotImplementedException();
 				}

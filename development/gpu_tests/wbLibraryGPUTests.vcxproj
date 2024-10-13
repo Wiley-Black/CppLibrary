@@ -26,25 +26,25 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_CPUOnly|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.6.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.4.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -60,21 +60,21 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)../../include;$(ProjectDir)../../config;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)config/GPU;$(ProjectDir)../../include;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)../dependencies/googletest-release-1.10.0;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(LibraryPath)</LibraryPath>
     <OutDir>$(ProjectDir)binaries\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_CPUOnly|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)CPUOnly_config;$(ProjectDir)../../include;$(ProjectDir)../../config;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)config/CPUOnly;$(ProjectDir)../../include;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)../dependencies/googletest-release-1.10.0;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(LibraryPath)</LibraryPath>
     <OutDir>$(ProjectDir)binaries\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(ProjectDir)../../include;$(ProjectDir)../../config;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)config/GPU;$(ProjectDir)../../include;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)../dependencies/googletest-release-1.10.0;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(LibraryPath)</LibraryPath>
     <OutDir>$(ProjectDir)binaries\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
@@ -126,7 +126,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="general.cpp" />    
+    <ClCompile Include="general.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="cuda_tests.cu" />
@@ -134,22 +134,23 @@
   <ItemGroup>
     <CustomBuild Include="FreeImageDLL.ref">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">COPY /y "$(ProjectDir)FreeImageDLL\x64\FreeImage.dll" "$(TargetDir)"</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug_CPUOnly|x64'">COPY /y "$(ProjectDir)FreeImageDLL\x64\FreeImage.dll" "$(TargetDir)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">COPY /y "$(SolutionDir)dependencies\FreeImageDLL\x64\FreeImage.dll" "$(TargetDir)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug_CPUOnly|x64'">COPY /y "$(SolutionDir)dependencies\FreeImageDLL\x64\FreeImage.dll" "$(TargetDir)"</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Copying dependency to target folder.</Message>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug_CPUOnly|x64'">Copying dependency to target folder.</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(TargetDir)FreeImage.dll</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug_CPUOnly|x64'">$(TargetDir)FreeImage.dll</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">COPY /y "$(ProjectDir)FreeImageDLL\x64\FreeImage.dll" "$(TargetDir)"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">COPY /y "$(SolutionDir)dependencies\FreeImageDLL\x64\FreeImage.dll" "$(TargetDir)"</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Copying dependency to target folder.</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(TargetDir)FreeImage.dll</Outputs>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CPUOnly_config\wbConfiguration.h" />
+    <ClInclude Include="config\CPUOnly\wbConfiguration.h" />
+    <ClInclude Include="config\GPU\wbConfiguration.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.6.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.4.targets" />
   </ImportGroup>
 </Project>

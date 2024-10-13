@@ -1064,7 +1064,7 @@ namespace wb
 #		error Platform-specific code is required for retrieving and calculating time zone bias information.
 #	endif
 
-		assert(nBiasMinutes > -1440 && nBiasMinutes < 1440);	// Possible range for bias is +/- 23.99 hours.		
+		assert(nBiasMinutes > -1440 && nBiasMinutes < 1440);	// Possible range for bias is +/- 23.99 hours.
 
 		return (nBiasMinutes * 60 /* seconds/minute */);
 

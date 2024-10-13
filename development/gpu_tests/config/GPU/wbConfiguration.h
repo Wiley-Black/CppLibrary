@@ -12,14 +12,15 @@
 //#define EmulateSTL					// For the rare case where we don't have STL available, my library can provide some parts of it.
 
 /** DeflateStream Implementation Method **/
-//#define DeflateStream_ZLibImpl			// Use the efficient zlib implementation, with dependency on the library.
-#define DeflateStream_InternImpl		// Use an internal implementation with no further dependencies.
+//#define DeflateStream_ZLibImpl		// Use the efficient zlib implementation, with dependency on the library.
+//#define DeflateStream_InternImpl		// Use an internal implementation with no further dependencies.
+#define No_DeflateStream				// Do not provide an implementation of DEFLATE compression.
 
 /** Image Implementation Method **/
-//#define CUDA_Support					// Define to provide CUDA support for image processing.
-//#define NPP_Support						// Leverage the NVIDIA Performance Primitives (NPP) library.
-//#define CUB_Support						// Leverage the CUB template library.
-//#define cuFFT_Support					// Leverage the cuFFT library.
+#define CUDA_Support					// Define to provide CUDA support for image processing.
+#define NPP_Support						// Leverage the NVIDIA Performance Primitives (NPP) library.
+#define CUB_Support						// Leverage the CUB template library.
+#define cuFFT_Support					// Leverage the cuFFT library.
 
 /** Image Processing Support **/
 //#define FITS_Support					// Define to include support for FITS files.  * Not fully implemented yet.

@@ -35,14 +35,14 @@ namespace wb
 		class FileInfo
 		{
 			friend class DirectoryInfo;
-		protected:			
-
+		protected:
 			/// <summary>Stores the full path to the file or directory.  In the case of a directory,
 			/// FullName should not be stored with the trailing directory separator.</summary>
 			Path FullName;
 			DateTime CreationTime;
 			DateTime LastWriteTime;
 			UInt64 Length;
+			
 		public:			
 			FileInfo() : Length(0) { }			
 			FileInfo(const osstring& Path);

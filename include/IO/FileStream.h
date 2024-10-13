@@ -417,7 +417,7 @@ namespace wb
 
 			#if defined(_WINDOWS)
 			HANDLE GetHandle() { return m_Handle; }
-			#endif			
+			#endif
 		};
 	}
 }

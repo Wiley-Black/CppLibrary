@@ -6,7 +6,7 @@
 
 using namespace wb;
 using namespace std;
-static const double M_PI = 3.14159265358979323846264338327950288;
+// static const double M_PI = 3.14159265358979323846264338327950288;
 
 #pragma region "gtest-like macro definitions"
 
@@ -179,21 +179,21 @@ bool CUDAImageProcessingTesting()
                 }
             }
 
-            string filename = "test.tif";
+            osstring filename = L"test.tif";
             imgA.Save(filename);
 
             auto imgB = Image<float>::Load(filename, gStream);
-            ASSERT_EQ(imgA.Width(), imgB.Width()) << "Image width was not the same after save-load to file '" << filename << "'\n";
-            ASSERT_EQ(imgA.Height(), imgB.Height()) << "Image height was not the same after save-load to file '" << filename << "'\n";
+            ASSERT_EQ(imgA.Width(), imgB.Width()) << "Image width was not the same after save-load to file '" << to_string(filename) << "'\n";
+            ASSERT_EQ(imgA.Height(), imgB.Height()) << "Image height was not the same after save-load to file '" << to_string(filename) << "'\n";
             for (int yy = 0; yy < imgA.Height(); yy++)
             {
                 for (int xx = 0; xx < imgA.Width(); xx++)
                 {
-                    ASSERT_NEAR(imgA(xx,yy), imgB(xx,yy), 1e-4) << "Pixel values (A: " << imgA(xx,yy) << ", B: " << imgB(xx,yy) << ") at position (" << xx << "," << yy << ") was not the same after save-load to file '" << filename << "'\n";
+                    ASSERT_NEAR(imgA(xx,yy), imgB(xx,yy), 1e-4) << "Pixel values (A: " << imgA(xx,yy) << ", B: " << imgB(xx,yy) << ") at position (" << xx << "," << yy << ") was not the same after save-load to file '" << to_string(filename) << "'\n";
                 } 
             }
 
-            io::File::Delete(filename);
+            io::File::Delete(to_osstring(filename));
         }
 
         /** Real Math test **/
@@ -343,8 +343,8 @@ bool CUDAImageProcessingTesting()
             std::cout << "Loading baboon test image and running FFT testing...\n";
 
             /** Load baboon test image and ensure it matches itself after a load-save-load cycle **/
-            auto imgColor = Image<RGBPixel>::Load("..\\test_data\\baboon.png", gStream);
-            string test_fn = "baboon_loadsaveload.tif";
+            auto imgColor = Image<RGBPixel>::Load(L"..\\test_data\\baboon.png", gStream);
+            osstring test_fn = to_osstring("baboon_loadsaveload.tif");
             if (io::File::Exists(test_fn)) io::File::Delete(test_fn);
             imgColor.Save(test_fn);
             auto imgColor2 = Image<RGBPixel>::Load(test_fn, gStream);
@@ -378,8 +378,8 @@ bool CUDAImageProcessingTesting()
             //imgFB.GetImag().Save("Freq_Baboon_Imag.tif");
 
             /** Load reference FFT results **/
-            auto imgRefBaboonFFTReal = Image<float>::Load("..\\test_data\\numpy_fft_baboon_real.tif", gStream);
-            auto imgRefBaboonFFTImag = Image<float>::Load("..\\test_data\\numpy_fft_baboon_imag.tif", gStream);
+            auto imgRefBaboonFFTReal = Image<float>::Load(L"..\\test_data\\numpy_fft_baboon_real.tif", gStream);
+            auto imgRefBaboonFFTImag = Image<float>::Load(L"..\\test_data\\numpy_fft_baboon_imag.tif", gStream);
             auto imgRefBaboonFFT = Image<thrust::complex<float>>::NewHostImage(imgRefBaboonFFTReal.Width(), imgRefBaboonFFTReal.Height(), gStream, HostFlags::None);
             imgRefBaboonFFT.SetReal(imgRefBaboonFFTReal);
             imgRefBaboonFFT.SetImag(imgRefBaboonFFTImag);
@@ -394,7 +394,7 @@ bool CUDAImageProcessingTesting()
             ASSERT_NEAR(0.0f, sumAbsError, imgError.Width() * imgError.Height() * 1e-4) << "Mismatch in FFT result between this code and numpy result for baboon grayscale image (sum error exceeded).\n";
 
             /** Perform inverse FFT **/
-            auto imgBaboonPrimeComplex = Image<thrust::complex<float>>::NewHostImage(imgFB.Width(), imgFB.Height());
+            auto imgBaboonPrimeComplex = Image<thrust::complex<float>>::NewHostImage(imgFB.Width(), imgFB.Height(), gStream, HostFlags::None);
             plan.Inverse(imgBaboonPrimeComplex, imgFB);            
             auto imgBaboonPrime = imgBaboonPrimeComplex.Absolute();
             imgBaboonPrime /= (imgBaboonPrime.Width() * imgBaboonPrime.Height());           // cuFFT computes unnormalized FFTs such that IFFT(FFT(A))=n A, where n is # of elements.  So remove this factor.

@@ -32,8 +32,7 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="Shared">
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -45,14 +44,14 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)../../include;$(ProjectDir)../../config;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)../../include;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)../dependencies/googletest-release-1.10.0;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(LibraryPath)</LibraryPath>
     <OutDir>$(ProjectDir)binaries\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(ProjectDir)../../include;$(ProjectDir)../../config;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)../../include;$(ProjectDir)../dependencies/googletest-release-1.10.0/include;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(ProjectDir)cub-1.8.0;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)../dependencies/googletest-release-1.10.0;$(ProjectDir)../dependencies/FreeImageDLL/x64;$(LibraryPath)</LibraryPath>
     <OutDir>$(ProjectDir)binaries\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
@@ -97,6 +96,5 @@
     <ClInclude Include="wbConfiguration.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets" />
 </Project>

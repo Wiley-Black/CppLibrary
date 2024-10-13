@@ -23,7 +23,7 @@ namespace wb
 		#ifdef FreeImage_Support
 		namespace FI
 		{
-			template<typename PixelType> inline Image<PixelType> LoadHelper(const string& filename, GPUStream Stream)
+			template<typename PixelType> inline Image<PixelType> LoadHelper(const osstring& filename, GPUStream Stream)
 			{
 				FreeImage_SetOutputMessage(ErrorHandler);
 				FREE_IMAGE_FORMAT fif = GetFormat(wb::io::Path::GetExtension(filename));
@@ -31,19 +31,19 @@ namespace wb
 				try
 				{
 					#ifdef _WIN32
-					pFIB = FreeImage_LoadU(fif, to_osstring(filename).c_str(), 0);
+					pFIB = FreeImage_LoadU(fif, filename.c_str(), 0);
 					#else
-					pFIB = FreeImage_Load(fif, filename.c_str(), 0);
+					pFIB = FreeImage_Load(fif, to_string(filename).c_str(), 0);
 					#endif
 				}
 				catch (std::exception& ex)
 				{
-					throw IOException("While loading image '" + filename + "': " + string(ex.what()));
+					throw IOException("While loading image '" + wb::to_string(filename) + "': " + string(ex.what()));
 				}
-				if (pFIB == nullptr) throw IOException("Unable to load image '" + filename + "': unspecified error");
-				if (FreeImage_GetBits(pFIB) == nullptr) throw IOException("Unable to load image '" + filename + "': image is empty and contains no pixel data");
+				if (pFIB == nullptr) throw IOException("Unable to load image '" + wb::to_string(filename) + "': unspecified error");
+				if (FreeImage_GetBits(pFIB) == nullptr) throw IOException("Unable to load image '" + wb::to_string(filename) + "': image is empty and contains no pixel data");
 				if (FreeImage_GetBPP(pFIB) != 8 * sizeof(PixelType)) 
-					throw FormatException("Image '" + filename + "': is a " + std::to_string(FreeImage_GetBPP(pFIB)) + " bpp image but a " + std::to_string(8 * sizeof(PixelType)) + " bpp image was expected.");
+					throw FormatException("Image '" + wb::to_string(filename) + "': is a " + std::to_string(FreeImage_GetBPP(pFIB)) + " bpp image but a " + std::to_string(8 * sizeof(PixelType)) + " bpp image was expected.");
 				auto img = Image<PixelType>::ExistingHostImageWrapper(FreeImage_GetWidth(pFIB), FreeImage_GetHeight(pFIB), FreeImage_GetPitch(pFIB), (PixelType*)FreeImage_GetBits(pFIB), true, Stream, HostFlags::None);
 				// The ExistingHostImageWrapper object will not take responsibility for freeing the bitmap memory (FreeImage_GetBits()) and we don't want it to.  However, the
 				// HostImageData object within it can be made to take care of the FIBITMAP* and can be responsible for freeing it.  In a slightly more optimized world, we could
@@ -54,11 +54,11 @@ namespace wb
 				return Flipped;
 			}
 
-			template<typename PixelType, FREE_IMAGE_COLOR_TYPE FICT, UInt32 RedMask, UInt32 GreenMask, UInt32 BlueMask> inline Image<PixelType> ColorLoadHelper(const string& filename, GPUStream Stream)
+			template<typename PixelType, FREE_IMAGE_COLOR_TYPE FICT, UInt32 RedMask, UInt32 GreenMask, UInt32 BlueMask> inline Image<PixelType> ColorLoadHelper(const osstring& filename, GPUStream Stream)
 			{
 				auto ret = LoadHelper<PixelType>(filename, Stream);
 				auto imgColorType = FreeImage_GetColorType(ret.m_HostData.m_pFileData);
-				if (imgColorType != FICT) throw FormatException("Image '" + filename + "': does not match expected color format.");
+				if (imgColorType != FICT) throw FormatException("Image '" + wb::to_string(filename) + "': does not match expected color format.");
 
 				auto FileRMask = FreeImage_GetRedMask(ret.m_HostData.m_pFileData);
 				auto FileGMask = FreeImage_GetGreenMask(ret.m_HostData.m_pFileData);
@@ -83,13 +83,13 @@ namespace wb
 					FileRMask = tmp;
 				}
 
-				if (FileRMask != RedMask || FileGMask != GreenMask || FileBMask != BlueMask) throw FormatException("Image '" + filename + "': does not match expected color format (masks).");
+				if (FileRMask != RedMask || FileGMask != GreenMask || FileBMask != BlueMask) throw FormatException("Image '" + wb::to_string(filename) + "': does not match expected color format (masks).");
 				return ret;
 			}
 
-			inline FREE_IMAGE_FORMAT GetFormat(const string& file_extension)
-			{
-				string ext = to_lower(file_extension);
+			inline FREE_IMAGE_FORMAT GetFormat(const osstring& file_extension)
+			{				
+				string ext = to_lower(wb::to_string(file_extension));				
 				if (ext.length() > 1 && ext[0] != '.') throw FormatException("GetFormat() requires that the first character of the file extension be a dot.");
 
 				if (IsEqual(ext, ".bmp")) return FIF_BMP;		// Windows or OS / 2 Bitmap File(*.BMP)
@@ -115,7 +115,7 @@ namespace wb
 		}
 		#endif
 
-		template<typename PixelType, typename FinalType> inline /*static*/ FinalType BaseImage<PixelType, FinalType>::LoadGeneric(const string& filename, GPUStream Stream)
+		template<typename PixelType, typename FinalType> inline /*static*/ FinalType BaseImage<PixelType, FinalType>::LoadGeneric(const osstring& filename, GPUStream Stream)
 		{
 			#ifdef FreeImage_Support
 			return FI::LoadHelper<PixelType>(filename, Stream);
@@ -124,11 +124,11 @@ namespace wb
 			throw FormatException("Unsupported file format.");
 		}
 
-		template<typename PixelType, typename FinalType> inline void BaseImage<PixelType, FinalType>::SaveGeneric(const string& filename, bool ApplyCompression)
+		template<typename PixelType, typename FinalType> inline void BaseImage<PixelType, FinalType>::SaveGeneric(const osstring& filename, bool ApplyCompression)
 		{
 			#ifdef FreeImage_Support
 			FreeImage_SetOutputMessage(FI::ErrorHandler);
-			FREE_IMAGE_FORMAT fif = FI::GetFormat(wb::to_string(wb::io::Path::GetExtension(filename)));
+			FREE_IMAGE_FORMAT fif = FI::GetFormat(wb::io::Path::GetExtension(filename));
 
 			// FreeImage needs the image to be flipped vertically, and needs the data on the host side.
 			// Note: the HostFlags::None is required to cause the host image data to be allocated using
@@ -146,9 +146,9 @@ namespace wb
 			#else
 			bool Success = FreeImage_Save(fif, Flipped.m_HostData.m_pFileData, filename.c_str(), flags);
 			#endif
-			if (!Success) throw IOException("Unable to save image to file '" + filename + "'.");
+			if (!Success) throw IOException("Unable to save image to file '" + wb::to_string(filename) + "'.");
 			#else
-			throw FormatException("Unsupported file format.");
+			throw FormatException("Unsupported file format: " + wb::to_string(filename));
 			#endif
 		}
 
@@ -156,12 +156,12 @@ namespace wb
 
 		#pragma region "Image<byte> Load/Save"
 
-		inline /*static*/ Image<byte> Image<byte>::Load(const string& filename, GPUStream Stream)
+		inline /*static*/ Image<byte> Image<byte>::Load(const osstring& filename, GPUStream Stream)
 		{
 			return base::LoadGeneric(filename, Stream);
 		}
 
-		inline void Image<byte>::Save(const string& sFilename)
+		inline void Image<byte>::Save(const osstring& sFilename)
 		{
 			#ifdef FreeImage_Support
 			SaveGeneric(sFilename);
@@ -229,9 +229,9 @@ namespace wb
 
 		#pragma region "Image<UInt16> Load/Save"
 
-		inline /*static*/ Image<UInt16> Image<UInt16>::Load(const std::string& filename, GPUStream Stream)
+		inline /*static*/ Image<UInt16> Image<UInt16>::Load(const osstring& filename, GPUStream Stream)
 		{
-			if (!io::File::Exists(to_osstring(filename).c_str())) throw FileNotFoundException("Image file not found.");
+			if (!io::File::Exists(filename.c_str())) throw FileNotFoundException("Image file not found.");
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
 			#ifdef LibTIFF_Support
@@ -256,7 +256,7 @@ namespace wb
 			return base::LoadGeneric(filename, Stream);
 		}
 
-		inline void Image<UInt16>::Save(const std::string& filename)
+		inline void Image<UInt16>::Save(const osstring& filename)
 		{
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
@@ -283,12 +283,12 @@ namespace wb
 
 		#pragma region "Image<float> Load/Save"
 
-		inline /*static*/ Image<float> Image<float>::Load(const string& filename, GPUStream Stream)
+		inline /*static*/ Image<float> Image<float>::Load(const osstring& filename, GPUStream Stream)
 		{
 			return base::LoadGeneric(filename, Stream);
 		}
 
-		inline void Image<float>::Save(const std::string& filename)
+		inline void Image<float>::Save(const osstring& filename)
 		{
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
@@ -330,9 +330,9 @@ namespace wb
 
 		#pragma region "Image<double> Load/Save"
 
-		inline /*static*/ Image<double> Image<double>::Load(const std::string& filename, GPUStream Stream)
+		inline /*static*/ Image<double> Image<double>::Load(const osstring& filename, GPUStream Stream)
 		{
-			if (!io::File::Exists(to_osstring(filename).c_str())) throw FileNotFoundException("Image file not found.");
+			if (!io::File::Exists(filename.c_str())) throw FileNotFoundException("Image file not found.");
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
 			#ifdef FITS_Support
@@ -397,7 +397,7 @@ namespace wb
 			return base::LoadGeneric(filename, Stream);
 		}
 
-		inline void Image<double>::Save(const std::string& filename)
+		inline void Image<double>::Save(const osstring& filename)
 		{
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
@@ -485,7 +485,7 @@ namespace wb
 
 		#pragma region "Image<RGBPixel> Load/Save"
 
-		inline /*static*/ Image<RGBPixel> Image<RGBPixel>::Load(const string& filename, GPUStream Stream)
+		inline /*static*/ Image<RGBPixel> Image<RGBPixel>::Load(const osstring& filename, GPUStream Stream)
 		{
 			#ifdef FreeImage_Support
 			#ifdef LITTLE_ENDIAN
@@ -498,7 +498,7 @@ namespace wb
 			throw FormatException("Unsupported file format.");
 		}
 
-		inline void Image<RGBPixel>::Save(const string& filename)
+		inline void Image<RGBPixel>::Save(const osstring& filename)
 		{
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
@@ -589,7 +589,7 @@ namespace wb
 
 		#pragma region "Image<RGBAPixel> Load/Save"
 
-		inline /*static*/ Image<RGBAPixel> Image<RGBAPixel>::Load(const string& filename, GPUStream Stream)
+		inline /*static*/ Image<RGBAPixel> Image<RGBAPixel>::Load(const osstring& filename, GPUStream Stream)
 		{
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
@@ -692,7 +692,7 @@ namespace wb
 			}
 		}
 
-		inline void Image<RGBAPixel>::Save(const string& filename)
+		inline void Image<RGBAPixel>::Save(const osstring& filename)
 		{
 			string ext = to_lower(wb::to_string(wb::io::Path::GetExtension(filename)));
 
@@ -783,19 +783,19 @@ namespace wb
 
 		#pragma region "Image<thurst::complex<float>> and Image<thrust::complex<double>> Load/Save"
 
-		inline /*static*/ Image<thrust::complex<float>> Image<thrust::complex<float>>::Load(const std::string& filename, GPUStream Stream) {
+		inline /*static*/ Image<thrust::complex<float>> Image<thrust::complex<float>>::Load(const osstring& filename, GPUStream Stream) {
 			return base::LoadGeneric(filename, Stream);
 		}
 
-		inline void Image<thrust::complex<float>>::Save(const string& filename) {
+		inline void Image<thrust::complex<float>>::Save(const osstring& filename) {
 			SaveGeneric(filename);
 		}
 
-		inline /*static*/ Image<thrust::complex<double>> Image<thrust::complex<double>>::Load(const std::string& filename, GPUStream Stream) {
+		inline /*static*/ Image<thrust::complex<double>> Image<thrust::complex<double>>::Load(const osstring& filename, GPUStream Stream) {
 			return base::LoadGeneric(filename, Stream);
 		}
 
-		inline void Image<thrust::complex<double>>::Save(const string& filename) {
+		inline void Image<thrust::complex<double>>::Save(const osstring& filename) {
 			SaveGeneric(filename);
 		}
 
