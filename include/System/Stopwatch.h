@@ -94,8 +94,6 @@ namespace wb
 		double		GetElapsedMilliseconds() const;
 		double		GetElapsedSeconds() const;
 
-		//Int64		GetElapsedNanoseconds() const;
-
 		std::string ToString(int Precision = 9) const;		
 	};
 
@@ -219,7 +217,9 @@ namespace wb
 		Start();
 	}
 
-#if 0	// GetElapsedNanoseconds() can rollover after something like 30 minutes... 
+// GetElapsedNanoseconds() can rollover after something like 30 minutes, so perhaps
+// it is best avoided or at least the API should be more cautious.
+#if 0
 	inline Int64 Stopwatch::GetElapsedNanoseconds() const
 	{
 		CheckInit();

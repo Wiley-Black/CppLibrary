@@ -63,8 +63,8 @@ namespace wb
 		}
 	}
 
-	/** Conversions **/	
-	
+	/** Conversions **/
+
 	inline string to_string(const string& str, const text::Encoding& ToEncoding = text::Encoding::GetDefault()) { return str; }
 	inline wstring to_wstring(const wstring& str, const text::Encoding& ToEncoding = text::Encoding::GetDefault()) { return str; }
 

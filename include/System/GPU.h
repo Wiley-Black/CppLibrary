@@ -339,17 +339,17 @@ namespace wb
 			public:
 
 				byte*		m_pData;
-				int			m_Size;
+				size_t		m_Size;
 
 				byte* GetDevicePtr() { return m_pData; }
-				int GetSize() { return m_Size; }
+				size_t GetSize() { return m_Size; }
 
-				bool IsAllocated(int nSize) const
+				bool IsAllocated(size_t nSize) const
 				{
 					return (m_pData != nullptr && m_Size >= nSize);
 				}
 
-				void Allocate(int nSize)
+				void Allocate(size_t nSize)
 				{
 					/** Re-use as-is? **/
 					if (IsAllocated(nSize)) return;     // Can use as-is.					
@@ -747,8 +747,7 @@ namespace wb
 				return GPUStream();
 			}
 
-			static GPUStream None()
-			{
+			static GPUStream None() {
 				return GPUStream();
 			}
 

@@ -181,8 +181,7 @@ namespace wb
 
 		// NPP = NVIDIA Performance Primitives
 		// NPPI = NVIDIA Performance Primitives, Imaging
-
-		#ifdef NPP_Support
+		
 		enum class InterpolationMethods
 		{
 			Undefined = NPPI_INTER_UNDEFINED,        /**<  Undefined filtering interpolation mode. */
@@ -196,8 +195,7 @@ namespace wb
 			Lanczos = NPPI_INTER_LANCZOS,       /**<  Lanczos filtering. */
 			Lanczos3_Advanced = NPPI_INTER_LANCZOS3_ADVANCED,       /**<  Generic Lanczos filtering with order 3. */
 			SmoothEdge = NPPI_SMOOTH_EDGE	/**<  Smooth edge filtering. */
-		};
-		#endif
+		};		
 		
 		#ifdef NPP_Support
 		namespace NPPI
