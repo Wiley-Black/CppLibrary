@@ -67,6 +67,9 @@
     <Filter Include="Parsing\Json">
       <UniqueIdentifier>{4786867f-58c5-436e-9f15-e8c611149026}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Math\Implementation">
+      <UniqueIdentifier>{0caf252c-21a9-4d57-8d5d-8dfa3dc994dd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\wbComplete.h" />
@@ -305,6 +308,21 @@
     </ClInclude>
     <ClInclude Include="..\include\Parsing\Yaml\YamlEventParser.h">
       <Filter>Parsing\Yaml</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Math\ndarray.h">
+      <Filter>Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Math\Implementation\ndarray_memory.h">
+      <Filter>Math\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Math\Implementation\ndarray_definitions.h">
+      <Filter>Math\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Math\Implementation\ndarray_helpers.h">
+      <Filter>Math\Implementation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\Math\Implementation\ndarray_view.h">
+      <Filter>Math\Implementation</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

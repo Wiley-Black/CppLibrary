@@ -75,7 +75,14 @@
 #else
 
 	/** Using language's native strongly-typed enum support **/
+	// Note: C++ seems to be lacking a way to overload constexpr such that constexpr inputs can provide
+	// a constexpr output.  For now, will just use a specially named function.
 #define AddFlagSupport(EnumType)			\
+	inline constexpr EnumType	constexpr_and(EnumType x, EnumType y) { return static_cast<EnumType>(static_cast<std::underlying_type<EnumType>::type>(x) & static_cast<std::underlying_type<EnumType>::type>(y)); }	\
+	inline constexpr EnumType	constexpr_or(EnumType x, EnumType y) { return static_cast<EnumType>(static_cast<std::underlying_type<EnumType>::type>(x) | static_cast<std::underlying_type<EnumType>::type>(y)); }	\
+	inline constexpr EnumType	constexpr_xor(EnumType x, EnumType y) { return static_cast<EnumType>(static_cast<std::underlying_type<EnumType>::type>(x) ^ static_cast<std::underlying_type<EnumType>::type>(y)); }	\
+	inline constexpr EnumType	constexpr_not(EnumType x) { return static_cast<EnumType>(~static_cast<std::underlying_type<EnumType>::type>(x)); }	\
+	\
 	inline EnumType	operator&(EnumType x, EnumType y) { return static_cast<EnumType>(static_cast<std::underlying_type<EnumType>::type>(x) & static_cast<std::underlying_type<EnumType>::type>(y)); }	\
 	inline EnumType	operator|(EnumType x, EnumType y) { return static_cast<EnumType>(static_cast<std::underlying_type<EnumType>::type>(x) | static_cast<std::underlying_type<EnumType>::type>(y)); }	\
 	inline EnumType	operator^(EnumType x, EnumType y) { return static_cast<EnumType>(static_cast<std::underlying_type<EnumType>::type>(x) ^ static_cast<std::underlying_type<EnumType>::type>(y)); }	\
@@ -111,6 +118,16 @@ inline double log2(double n) { return log(n) / log((double)2.0); }
 #include "../Foundation/STL/Memory.h"
 #include "../Foundation/STL/Collections/Stack.h"
 #include "../Foundation/STL/Collections/Queue.h"
+
+/// <summary>
+/// is_type() is a helper function that tests whether the given pointer can be dynamic_cast to another pointer type.  
+/// </summary>
+/// <seealso>dynamic_pointer_movecast()</seealso>
+/// <returns>True if the pointer can be cast to the specified type.  False if the pointer has a nullptr value or is 
+/// not castable to the templated Target type as a pointer.</returns>
+template<typename Target> static inline bool is_type(const void* ptr) {
+	return dynamic_cast<Target*>(ptr) != nullptr;
+}
 
 /// <summary>
 /// is_type() is a helper function that tests whether the given pointer can be dynamic_cast to another pointer type.  

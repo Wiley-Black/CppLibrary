@@ -46,6 +46,11 @@
     <ClInclude Include="..\include\IO\Path.h" />
     <ClInclude Include="..\include\IO\Streams.h" />
     <ClInclude Include="..\include\IO\StreamWriter.h" />
+    <ClInclude Include="..\include\Math\Implementation\ndarray_definitions.h" />
+    <ClInclude Include="..\include\Math\Implementation\ndarray_helpers.h" />
+    <ClInclude Include="..\include\Math\Implementation\ndarray_memory.h" />
+    <ClInclude Include="..\include\Math\Implementation\ndarray_view.h" />
+    <ClInclude Include="..\include\Math\ndarray.h" />
     <ClInclude Include="..\include\Math\Random.h" />
     <ClInclude Include="..\include\Memory Management\Buffer.h" />
     <ClInclude Include="..\include\Memory Management\FixedRingBuffer.h" />

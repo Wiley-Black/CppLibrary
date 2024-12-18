@@ -76,6 +76,21 @@
 
 #endif		// CUDA_Support
 
+/** IGPUStreamAsyncWatcher interface (must be defined ahead of include) **/
+namespace wb
+{
+	namespace cuda
+	{
+		class GPUStream;		// Foward reference
+		struct IGPUStreamAsyncWatcher
+		{
+			virtual void on_async_completed(GPUStream& stream) = 0;
+		};
+	}
+}
+
+#include "../Math/Implementation/ndarray_definitions.h"		// Need INDArrayAllocator, which is implemented by GPUStream.
+
 namespace wb
 {
 	namespace cuda
@@ -150,9 +165,7 @@ namespace wb
 			GPUException& operator=(const GPUException& right) { Exception::operator=(right); return *this; }
 		};
 
-		#pragma endregion
-
-		#ifdef CUDA_Support
+		#pragma endregion		
 
 		#pragma region "Definitions"
 
@@ -175,6 +188,8 @@ namespace wb
 		inline int divup(const int numerator, const int denominator) { return (numerator + (denominator - 1)) / denominator; }
 
 		#pragma endregion
+
+		#ifdef CUDA_Support
 
 		#pragma region "Error handling"
 
@@ -450,6 +465,7 @@ namespace wb
 					cudaThrowable(cudaSetDevice(ii));
 
 					// Perform test memory allocations with cudaMemoryPitch() to understand its results:
+					// TODO: this is device specific, in the situation where there are 2+ GPUs in the system.
 					std::vector<size_t> device_pitch_map;
 					for (int iPow2 = 0; iPow2 < 12; iPow2++)
 					{
@@ -525,7 +541,7 @@ namespace wb
 		/// The New() call can also accept a string that identifies the stream in NVIDIA Nsight Tools when
 		/// NVTX_Enable is defined.  It takes no resources when NVTX_Enable is disabled.
 		/// </summary>
-		class GPUStream
+		class GPUStream : public math::memory::INDArrayAllocator
 		{
 			struct GPUStreamData
 			{			
@@ -541,6 +557,11 @@ namespace wb
 				/// convention and will avoid unnecessary memory allocation.
 				/// </summary>
 				vector<memory::DeviceScratchBuffer>	scratch;
+
+				/// <summary>
+				/// See the TrackAsync() and StopTrackAsync() functions.
+				/// </summary>
+				vector<IGPUStreamAsyncWatcher*>	async_tracking;
 
 				GPUStreamData(cudaStream_t fromStream = nullptr, bool responsible_ = true) : stream(fromStream), responsible(responsible_)
 				{
@@ -655,16 +676,60 @@ namespace wb
 				return m_pData->stream; 
 			}
 
+			bool operator==(const GPUStream& rhs)
+			{
+				return this->m_pData.get() == rhs.m_pData.get();
+			}
+
+			bool operator!=(const GPUStream& rhs)
+			{
+				return this->m_pData.get() != rhs.m_pData.get();
+			}
+
 			GPUSystemInfo& GetGSI()
 			{
 				if (m_pGSI == nullptr) throw NotSupportedException("Cannot access GPUStream created with None().");
 				return *m_pGSI;
+			}			
+
+			/// <summary>
+			/// Requests a single notification when a Synchronize() is performed on this stream.
+			/// Note that only calls to Synchronize() will trigger the notification and calls made
+			/// directly to cudaStreamSynchronize() will circumvent this mechanism.
+			/// </summary>
+			/// <param name="p_add_watcher">The interface object to receive the callback</param>
+			void TrackAsync(IGPUStreamAsyncWatcher* p_add_watcher)
+			{
+				if (m_pData == nullptr) throw NotSupportedException("Cannot access GPUStream created with None().");
+				m_pData->async_tracking.push_back(p_add_watcher);
+			}
+
+			/// <summary>
+			/// Removes all earlier requests for Synchronize() notification for a particular
+			/// IGPUStreamAsyncWatcher.  This is an important call if the IGPUStreamAsyncWatcher
+			/// is going out of scope before the GPUStream is so as to prevent an illegal access
+			/// by sending the notification to an out-of-scope object.
+			/// </summary>
+			void StopTrackAsync(IGPUStreamAsyncWatcher* p_remove_watcher)
+			{
+				if (m_pData == nullptr) throw NotSupportedException("Cannot access GPUStream created with None().");
+				size_t ii = 0;
+				for (;;)
+				{
+					if (m_pData->async_tracking[ii] == p_remove_watcher)
+						m_pData->async_tracking.erase(m_pData->async_tracking.begin() + ii);
+					else
+						ii++;
+					if (ii >= m_pData->async_tracking.size()) return;
+				}
 			}
 
 			void Synchronize()
 			{
 				if (m_pData == nullptr) throw NotSupportedException("Cannot access GPUStream created with None().");
 				cudaThrowable(cudaStreamSynchronize(m_pData->stream));
+				for (auto p_watcher : m_pData->async_tracking) p_watcher->on_async_completed(*this);
+				m_pData->async_tracking.clear();
 			}
 
 			#ifdef NPP_Support
@@ -685,7 +750,10 @@ namespace wb
 				cudaThrowable(cudaStreamGetFlags(m_pData->stream, &ret.nStreamFlags));
 				return ret;
 			}
-			#endif
+			#endif			
+
+			// Implement INDArrayAllocator...			
+			math::memory::NDArrayBuffer* new_ndarray_buffer() override;
 		};
 
 		inline std::ostream& operator<<(std::ostream& os, const GPUStream& gStream)
@@ -757,6 +825,18 @@ namespace wb
 			GPUStream(GPUStream&& mvStream) noexcept = default;
 			GPUStream& operator=(const GPUStream&) = default;
 			GPUStream& operator=(GPUStream&&) = default;
+
+			bool operator==(const GPUStream& rhs)
+			{
+				return true;
+			}
+
+			bool operator!=(const GPUStream& rhs)
+			{
+				return false;
+			}
+
+			void Synchronize() { }
 		};
 
 		#endif			// CUDA_Support		
@@ -787,6 +867,25 @@ namespace wb
 		#define COMMA ,
 	}
 }
+
+// Late dependencies
+
+#include "../Math/Implementation/ndarray_memory.h"
+
+#ifdef CUDA_Support
+namespace wb
+{
+	namespace cuda
+	{
+		inline math::memory::NDArrayBuffer* GPUStream::new_ndarray_buffer()
+		{
+			// Note: it's important to use the constructor that does not explicitly specify alignment such that the 
+			// optimal alignment is chosen automatically.
+			return new math::memory::CUDADeviceBuffer(*this);
+		}
+	}
+}
+#endif
 
 #endif  // __wbGPU_h__
 
